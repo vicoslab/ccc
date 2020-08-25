@@ -29,7 +29,7 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: vicoslab/ccc
         path: base
-        tags: ${{ matrix.TAG }}
+        tags: base-${{ matrix.TAG }}
         build_args: ROOT_IMAGE=${{ matrix.ROOT_IMAGE }}
         always_pull: true
 
@@ -41,7 +41,7 @@ jobs:
         repository: vicoslab/ccc
         path: jupyter
         tags: jupyter-${{ matrix.TAG }}
-        build_args: ROOT_IMAGE=ccc-base:${{ matrix.TAG  }}
+        build_args: ROOT_IMAGE=ccc:base-${{ matrix.TAG  }}
         always_pull: true
 
     - name: Build and push X11 CCC image
@@ -52,5 +52,5 @@ jobs:
         repository: vicoslab/ccc
         path: x2go
         tags: x2go-${{ matrix.TAG }}
-        build_args: ROOT_IMAGE=ccc-base:${{ matrix.TAG  }}, X11_SERVER=x2go
+        build_args: ROOT_IMAGE=ccc:base-${{ matrix.TAG  }}, X11_SERVER=x2go
         always_pull: true
