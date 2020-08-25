@@ -1,0 +1,114 @@
+#!/bin/sh
+
+sv_stop() {
+    echo "*** Stopping services"
+    for s in $(ls -d /etc/service/*)
+    do
+        /sbin/sv stop $s
+    done
+}
+
+# This function will check if booting has already been attempted several times and use recovery ENVs in that case
+# Uses ENVs: 
+#   $RUNIT_STATUS_FILE .. path to file with status of the runit (running, booting attempts, recovery)
+#   $RUNIT_WORKING_ENV_FILE .. path to stored ENV files
+sv_runit_initd_begin() {
+    
+    if [ -z "$RUNIT_STATUS_FILE" ] || [ -z "$RUNIT_WORKING_ENV_FILE" ] 
+    then
+        return 0
+    fi
+
+    # check how many times have we booted already without success
+    if [ -f $RUNIT_STATUS_FILE ] 
+    then
+        init_retries=$( cat $RUNIT_STATUS_FILE | sed -n "s/^booting \([0-9].*\)/\1/p" )    
+    fi
+
+    # set init_retries to 0 if this is the first try
+    if [ -z $init_retries ]
+    then
+        init_retries=0
+    fi
+
+    # if we booted more then 2 times then revert back to last known config if GOOD_ENV_FILE exists
+    if [ $init_retries -gt 2 ] && [ -f $RUNIT_WORKING_ENV_FILE ]
+    then
+        echo ""
+        echo "##################################################################################################################"
+        echo "WARNING WARNING !"
+        echo "WARNING WARNING !"
+        echo ""
+        echo "Several failed boot attempts!"
+        echo "Reverting ENVs to the last known good values from $RUNIT_WORKING_ENV_FILE"
+        echo ""
+        echo "##################################################################################################################"
+        echo ""
+        # read last known good configuration from $RUNIT_WORKING_ENV_FILE
+        . $RUNIT_WORKING_ENV_FILE
+
+        echo "failed boot - running with last known working ENVs" > $RUNIT_STATUS_FILE
+        return 1
+    else
+        echo "booting $((init_retries + 1))" > $RUNIT_STATUS_FILE
+    fi
+    return 0
+}
+
+sv_runit_initd_end() {
+    if [ -z "$RUNIT_STATUS_FILE" ] || [ -z "$RUNIT_WORKING_ENV_FILE" ] 
+    then
+        return 1
+    fi
+    
+    echo "running" > $RUNIT_STATUS_FILE
+
+    # save last-working-config (i.e. envs) by copying /etc/envvars
+    cp /etc/envvars $RUNIT_WORKING_ENV_FILE
+}
+
+trap "sv_stop; exit" SIGTERM
+
+echo "" > /etc/envvars
+for K in $(env | sed -n 's#^\([A-Za-z][a-zA-Z0-9_]*\)=.*$#\1#p')
+do
+    VAL=$(eval "printf \"\$${K}\"")
+    num_lines=$(printf "$VAL" | grep -c .)
+    
+    if [ $num_lines -ge 2 ]
+    then
+        # retain multiline strings
+        echo "read ${K} << EOM" >> /etc/envvars
+cat <<- EOF >> /etc/envvars
+${VAL}
+EOF
+# DO NOT ADD SPACE/INDENT since /bin/sh will not handle it correctly
+        echo "EOM" >> /etc/envvars
+        echo "export ${K}" >> /etc/envvars
+    else
+        echo "export ${K}=\"${VAL}\"" >> /etc/envvars
+    fi
+done
+
+echo "Starting pre-service scripts in /etc/runit_init.d"
+
+sv_runit_initd_begin
+recovery_boot=$?
+
+for script in /etc/runit_init.d/*
+do
+    if [ -x "$script" ]; then
+        echo >&2 "*** Running: $script"
+        $script
+        retval=$?
+        if [ $retval != 0 ];
+        then
+            echo >&2 "*** Failed with return value: $retval"
+            exit $retval
+        fi
+    fi
+done
+[ "$recovery_boot" -eq 0 ] && sv_runit_initd_end
+
+/usr/bin/runsvdir /etc/service &
+wait

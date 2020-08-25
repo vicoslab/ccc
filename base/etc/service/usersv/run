@@ -1,0 +1,10 @@
+#!/bin/bash -e
+
+USER_NAME=${USER_NAME:-user}
+USER_HOME=${BASE%"/"}/$USER_NAME
+
+chpst -u $USER_NAME mkdir -p $USER_HOME/.services/
+
+exec 2>&1
+exec chpst -u$USER_NAME runsvdir $USER_HOME/.services/
+

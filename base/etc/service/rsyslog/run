@@ -1,0 +1,4 @@
+#!/bin/sh -e
+
+exec /usr/sbin/rsyslogd -n 2>&1
+

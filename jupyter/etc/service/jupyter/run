@@ -1,0 +1,13 @@
+#!/bin/bash -e
+
+USER_NAME=${USER_NAME:-user}
+USER_HOME=${BASE%"/"}/$USER_NAME
+
+export HOME=$USER_HOME
+chpst -u $USER_NAME bash /etc/service/jupyter/config.sh 2>&1
+
+TOKEN=`date +%s | sha256sum | base64 | head -c 32`
+echo $TOKEN | chpst -u $USER_NAME tee $USER_HOME/jupyter.token
+
+exec chpst -u $USER_NAME jupyter notebook --NotebookApp.token=$TOKEN --no-browser --ip="0.0.0.0" --port="8080" --notebook-dir=${USER_HOME}/workspace 2>&1
+

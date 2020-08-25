@@ -1,0 +1,8 @@
+#!/bin/bash -e
+
+mkdir -p /run/sshd
+
+source /etc/service/sshd/config.sh
+
+exec /usr/sbin/sshd -D 2>&1
+
