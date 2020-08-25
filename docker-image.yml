@@ -1,0 +1,56 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+
+jobs:  
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - ROOT_IMAGE: ubuntu18.04
+            TAG: ubuntu18.04
+          - ROOT_IMAGE: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+            TAG: ubuntu18.04-cuda10.1
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Build and push base CCC image
+      uses: docker/build-push-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: vicoslab/ccc
+        path: base
+        tags: ${{ matrix.TAG }}
+        build_args: ROOT_IMAGE= ${{ matrix.ROOT_IMAGE }}
+        always_pull: true
+
+    - name: Build and push jupyter CCC image
+      uses: docker/build-push-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: vicoslab/ccc
+        path: jupyter
+        tags: jupyter-${{ matrix.TAG }}
+        build_args: ROOT_IMAGE=ccc-base:${{ matrix.TAG  }}
+        always_pull: true
+
+    - name: Build and push X11 CCC image
+      uses: docker/build-push-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: vicoslab/ccc
+        path: x2go
+        tags: x2go-${{ matrix.TAG }}
+        build_args: ROOT_IMAGE=ccc-base:${{ matrix.TAG  }}, X11_SERVER=x2go
+        always_pull: true
