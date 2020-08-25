@@ -50,7 +50,7 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: vicoslab/ccc
-        path: x2go
+        path: x11
         tags: x2go-${{ matrix.TAG }}
         build_args: ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }}, X11_SERVER=x2go
         always_pull: true
