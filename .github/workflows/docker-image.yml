@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - ROOT_IMAGE: ubuntu18.04
+          - ROOT_IMAGE: ubuntu:18.04
             TAG: ubuntu18.04
           - ROOT_IMAGE: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
             TAG: ubuntu18.04-cuda10.1
@@ -30,7 +30,7 @@ jobs:
         repository: vicoslab/ccc
         path: base
         tags: ${{ matrix.TAG }}
-        build_args: ROOT_IMAGE= ${{ matrix.ROOT_IMAGE }}
+        build_args: ROOT_IMAGE=${{ matrix.ROOT_IMAGE }}
         always_pull: true
 
     - name: Build and push jupyter CCC image
