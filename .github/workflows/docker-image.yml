@@ -31,6 +31,7 @@ jobs:
         path: base
         tags: base-${{ matrix.TAG }}
         build_args: ROOT_IMAGE=${{ matrix.ROOT_IMAGE }}
+        cache_froms: vicoslab/ccc:base-${{ matrix.TAG }}
         always_pull: true
 
     - name: Build and push jupyter CCC image
@@ -42,6 +43,7 @@ jobs:
         path: jupyter
         tags: jupyter-${{ matrix.TAG }}
         build_args: ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }}
+        cache_froms: vicoslab/ccc:jupyter-${{ matrix.TAG }}
         always_pull: true
 
     - name: Build and push X11 CCC image
@@ -53,4 +55,5 @@ jobs:
         path: x11
         tags: x2go-${{ matrix.TAG }}
         build_args: ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }}, X11_SERVER=x2go
+        cache_froms: vicoslab/ccc:x2go-${{ matrix.TAG }}
         always_pull: true
