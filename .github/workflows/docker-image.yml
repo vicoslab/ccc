@@ -1,11 +1,10 @@
 name: Docker Image CI
 
+# build only when new tag is added
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
-
+    tags: 
+      - '**' 
 
 jobs:  
   build:
@@ -19,6 +18,10 @@ jobs:
             TAG: ubuntu18.04-cuda10.1
           
     steps:
+    - name: Get tag name
+      id: get_tag_name
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+    
     - name: Checkout code
       uses: actions/checkout@v2
       
@@ -29,9 +32,9 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: vicoslab/ccc
         path: base
-        tags: base-${{ matrix.TAG }}
+        tags: base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},base-latest-${{ matrix.TAG }}
         build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=${{ matrix.ROOT_IMAGE }}
-        cache_froms: vicoslab/ccc:base-${{ matrix.TAG }}
+        cache_froms: vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
 
     - name: Build and push jupyter CCC image
@@ -41,9 +44,9 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: vicoslab/ccc
         path: jupyter
-        tags: jupyter-${{ matrix.TAG }}
-        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }}
-        cache_froms: vicoslab/ccc:jupyter-${{ matrix.TAG }},vicoslab/ccc:base-${{ matrix.TAG }}
+        tags: jupyter-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jupyter-latest-${{ matrix.TAG }}
+        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
+        cache_froms: vicoslab/ccc:jupyter-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
 
     - name: Build and push X11 CCC image
@@ -53,7 +56,7 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: vicoslab/ccc
         path: x11
-        tags: x2go-${{ matrix.TAG }}
-        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }},X11_SERVER=x2go
-        cache_froms: vicoslab/ccc:x2go-${{ matrix.TAG }},vicoslab/ccc:base-${{ matrix.TAG }}
+        tags: x2go-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},x2go-latest-${{ matrix.TAG }}
+        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }},X11_SERVER=x2go
+        cache_froms: vicoslab/ccc:x2go-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
