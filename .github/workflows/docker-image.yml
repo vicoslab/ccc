@@ -54,6 +54,6 @@ jobs:
         repository: vicoslab/ccc
         path: x11
         tags: x2go-${{ matrix.TAG }}
-        build_args: ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }}, X11_SERVER=x2go
+        build_args: ROOT_IMAGE=vicoslab/ccc:base-${{ matrix.TAG  }},X11_SERVER=x2go
         cache_froms: vicoslab/ccc:x2go-${{ matrix.TAG }}
         always_pull: true
