@@ -69,9 +69,23 @@ sv_runit_initd_end() {
 
 trap "sv_stop; exit" SIGTERM
 
+echo "Saving environment variables to /etc/envvars"
 echo "" > /etc/envvars
+
+invalid_envs="HOME HOSTNAME TERM PWD USER USERNAME _"
 for K in $(env | sed -n 's#^\([A-Za-z][a-zA-Z0-9_]*\)=.*$#\1#p')
 do
+    VALID=1
+    for var in $(echo "$invalid_envs" | tr ' ' '\n') 
+    do
+        if [ "$K" = "$var" ] &&  [ $VALID -eq 1 ]; then
+            VALID=0
+        fi
+    done
+    if [ "$VALID" -eq 0 ]; then
+        continue
+    fi
+    
     VAL=$(eval "printf \"\$${K}\"")
     num_lines=$(printf "$VAL" | grep -c .)
     
@@ -89,6 +103,9 @@ EOF
         echo "export ${K}=\"${VAL}\"" >> /etc/envvars
     fi
 done
+
+echo "Setting environment variables for default profile startup"
+echo ". /etc/envvars" > /etc/profile.d/00_container_envs.sh
 
 echo "Starting pre-service scripts in /etc/runit_init.d"
 

@@ -5,7 +5,6 @@ LABEL maintainer "Luka Cehovin Zajc <luka.cehovin@fri.uni-lj.si>"
 ENV DEBIAN_FRONTEND noninteractive
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
-ENV PATH /opt/conda/bin:$PATH
 ENV BASE=/home
 
 RUN apt-get update --fix-missing && \
