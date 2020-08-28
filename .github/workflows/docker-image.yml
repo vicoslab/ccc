@@ -20,7 +20,7 @@ jobs:
             TAG: ubuntu18.04-cuda10.1
           - ROOT_IMAGE: nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04
             TAG: ubuntu18.04-cuda10.2
-          - ROOT_IMAGE: nvidia/cuda:11.0-cudnn7-devel-ubuntu18.04
+          - ROOT_IMAGE: nvidia/cuda:11.0-cudnn8-devel-ubuntu18.04
             TAG: ubuntu18.04-cuda11.0
           
     steps:
