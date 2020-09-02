@@ -2,5 +2,5 @@
 
 mkdir -p /var/run/dbus
 
-exec /usr/bin/dbus-daemon --system --syslog-only --nofork 2>&1
+exec /usr/bin/dbus-daemon --system --nofork 2>&1
 
