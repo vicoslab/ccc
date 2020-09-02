@@ -10,12 +10,18 @@ fi
 cat > /etc/motd << EOF
 Welcome to Conda Compute Container (https://github.com/vicoslab/ccc)
 
-Running ${DISTRIB_DESCRIPTION} on ${HOSTNAME} and pre-installed:
+Running ${DISTRIB_DESCRIPTION} on node '${HOSTNAME}' with:
+
+ * Docker image: ${CONTAINER_IMAGE}
+ * Container name: ${CONTAINER_NAME}
+  
  * APT-GET sources: '${INSTALL_REPOSITORY_SOURCES}'
  * APT-GET keys: '${INSTALL_REPOSITORY_KEYS}'
  * APT-GET packges: '${INSTALL_PACKAGES}'
+ 
  * Miniconda: /home/$USER_NAME/conda
 
+${CONTAINER_WELCOME_MSG}
 EOF
 
 if [ ! -z $RUNIT_STATUS_FILE ] && [ $(cat $RUNIT_STATUS_FILE | grep -c 'failed boot') -ne 0 ]
