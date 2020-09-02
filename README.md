@@ -28,6 +28,11 @@ Optional environmental variables:
  * RUNIT_STATUS_FILE: path to file where container will report its boot status (e.g., running, booting [NUM], failed boot)
  * RUNIT_WORKING_ENV_FILE: path to file where last working ENVs are stored (for recovery if invalid ENV values supplied)
 
+Optional environmental variables used provide user info in login text
+ * CONTAINER_NAME: name of the container
+ * CONTAINER_NODE: host/node name 
+ * CONTAINER_IMAGE: docker image that is running
+ * CONTAINER_WELCOME_MSG: additional login text
 
 Jupyter
 -------
@@ -41,4 +46,4 @@ X11 support with XFCE4 and X2Go
 Extends base image with XFCE4 and X2Go server, which is run when client connects through the SSH. Image also installs `mate-terminal krusader ristretto gvfs gvfs-backends thunar-archive-plugin kio-extras ktexteditor-katepart` packages and default themes with `xubuntu-artwork xubuntu-icon-theme  breeze-icon-theme` packages. 
 
 Additional Environmental variables:
- * APPS: installs symlinks to `/usr/local/bin` (paths separated by :)
+ * APPS: installs symlinks to `/usr/local/bin` (paths separated by ':', each path can also provide symlink name seperated by comma, e.g.: `/opt/pycharm-pro/bin/pycharm:/opt/pycharm-free/bin/pycharm.sh,pycharm-free` will create `pycharm` and `pycharm-free` bins)

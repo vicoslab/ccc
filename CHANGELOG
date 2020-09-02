@@ -1,4 +1,9 @@
 Changes for v1.01:
  
  - added loading of default container environment variables from /etc/envvars in /etc/profile.d/00_container_envs.sh
+ - added option to specify app name in APPS env for x11 containers
+
+ - updated welcome message with docker image, container name and any additional user supplied msg (CONTAINER_NAME, CONTAINER_IMAGE and CONTAINER_WELCOME_MSG envs must be provided now)
+
  - removed saving HOME HOSTNAME TERM PWD USER USERNAME _ in/etc/envvars
+ - removed newer flag in dbus run to make it compatible with ubuntu 16.04
