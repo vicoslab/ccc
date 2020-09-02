@@ -28,11 +28,11 @@ Optional environmental variables:
  * RUNIT_STATUS_FILE: path to file where container will report its boot status (e.g., running, booting [NUM], failed boot)
  * RUNIT_WORKING_ENV_FILE: path to file where last working ENVs are stored (for recovery if invalid ENV values supplied)
 
-Optional environmental variables used provide user info in login text
+Optional environmental variables used to provide info at login
  * CONTAINER_NAME: name of the container
- * CONTAINER_NODE: host/node name 
+ * CONTAINER_NODE: host/node name where container is running
  * CONTAINER_IMAGE: docker image that is running
- * CONTAINER_WELCOME_MSG: additional login text
+ * CONTAINER_WELCOME_MSG: custom login text at the end
 
 Jupyter
 -------
