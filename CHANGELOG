@@ -1,3 +1,6 @@
+Changes for v1.02:
+ - added option to assign groups to the user through USER_GROUPS environment variable
+ 
 Changes for v1.01:
  
  - added loading of default container environment variables from /etc/envvars in /etc/profile.d/00_container_envs.sh

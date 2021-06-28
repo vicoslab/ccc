@@ -21,6 +21,25 @@ if [ $EXISTS != 0 ]; then
     chpst -u $USER_NAME cp -r -n /etc/skel/. $USER_HOME/.
 fi
 
+if [ ! -z "${USER_GROUPS}" ]; then
+    # split groups into list using ',' as separator
+    IFS=',' read -ra USER_GROUPS <<< "${USER_GROUPS}"
+    for GRPUP_NAME_ID in "${USER_GROUPS[@]}"
+    do
+        # split with "=" to get name and id
+        IFS='=' read -ra GRPUP_NAME_ID <<< "${GRPUP_NAME_ID}"
+        GROUP_NAME=${GRPUP_NAME_ID[0]}
+        GROUP_ID=${GRPUP_NAME_ID[1]}
+        
+        if [ ! -z "${GROUP_ID}" ]; then
+            groupadd  -f -g $GROUP_ID $GROUP_NAME
+        else
+            groupadd  -f $GROUP_NAME
+        fi
+        usermod -a -G $GROUP_NAME $USER_NAME
+    done
+fi
+
 CURRENT_HOME_OWNER=$(stat -c '%U' $USER_HOME)
 
 if [ "$CURRENT_HOME_OWNER" != "$USER_NAME" ]; then
