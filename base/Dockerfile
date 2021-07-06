@@ -8,7 +8,10 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV BASE=/home
 
 RUN apt-get update --fix-missing && \
-    apt-get install -y build-essential wget bzip2 ca-certificates libglib2.0-0 libxext6 libsm6 libxrender1 git runit rsyslog cron cmake openssh-server && \
+    apt-get install -y build-essential wget bzip2 ca-certificates \
+			libglib2.0-0 libxext6 libsm6 libxrender1 libgl1-mesa-glx libglu1-mesa libxt6 libxtst6 libxi6 \
+			nano htop tmux curl git cmake \
+			runit rsyslog cron  openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
