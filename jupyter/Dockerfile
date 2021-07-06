@@ -12,6 +12,8 @@ RUN pip3 install jupyterlab notebook ipywidgets jupyter-server-proxy
 
 COPY etc /etc/
 
-EXPOSE 8080
-LABEL frp.8080="http"
+ENV JUPYTER_PORT 8080
+
+EXPOSE $JUPYTER_PORT
+LABEL frp.$JUPYTER_PORT="http"
 
