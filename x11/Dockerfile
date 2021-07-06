@@ -44,6 +44,9 @@ RUN git clone https://github.com/Xpra-org/xpra-html5 . && ./setup.py install /us
 
 ENV XPRA_PROXY_HTML5_PORT 8888
 
+EXPOSE $XPRA_PROXY_HTML5_PORT
+LABEL frp.$XPRA_PROXY_HTML5_PORT="http"
+
 #### FINAL DOCKER based on user-supplied X11_SERVER Switch  ####    
 FROM xfce4-${X11_SERVER}
 LABEL maintainer "Domen Tabernik <domen.tabernik@fri.uni-lj.si>"
