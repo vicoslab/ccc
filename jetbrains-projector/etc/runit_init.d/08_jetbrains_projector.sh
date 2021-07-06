@@ -68,7 +68,7 @@ chpst -u $USER_NAME mkdir -p $USER_HOME/.projector/apps
 chpst -u $USER_NAME mkdir -p $USER_HOME/.projector/configs
 chpst -u $USER_NAME mkdir -p $USER_HOME/.projector/cache
 
-if [ -z "$($PROJECTOR_BIN config list | grep $PROJECTOR_CONFIG)" ]; then
+if [ -z "$($PROJECTOR_BIN config list | grep " ${PROJECTOR_CONFIG}$")" ]; then
 	
 	# install default app
 	echo "Installing '$PROJECTOR_IDE' as JetBrains projector app under config name '$PROJECTOR_CONFIG' (port: $PROJECTOR_PORT)"
