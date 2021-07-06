@@ -1,0 +1,9 @@
+#!/bin/sh -e
+
+# include configuration file that should do all checks and setup variables
+. ./configure.sh
+
+## start projector	
+echo '######################################################################################################' | tee $LOG_DIR/projector.log
+echo '############################### STARTED JetBrains Projector ##########################################' | tee $LOG_DIR/projector.log
+exec chpst -u $USER_NAME $PROJECTOR_BIN run $PROJECTOR_CONFIG >> $LOG_DIR/projector.log 2>&1
