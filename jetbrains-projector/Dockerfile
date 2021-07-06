@@ -14,3 +14,11 @@ RUN apt-get clean && \
 COPY etc /etc/
 
 WORKDIR /
+
+env PROJECTOR_IDE "PyCharm Professional Edition 2021.1.3"
+env PROJECTOR_PORT 9999
+env PROJECTOR_CONFIG default
+
+EXPOSE $PROJECTOR_PORT
+LABEL frp.$PROJECTOR_PORT="https"
+
