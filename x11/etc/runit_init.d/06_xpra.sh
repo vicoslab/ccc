@@ -6,8 +6,9 @@ USER_ID=`id -u $USER_NAME`
 
 export HOME=$USER_HOME
 
-mkdir "/run/user/${USER_ID}" 
-mkdir "/run/xpra"
+mkdir -p "/run/user/${USER_ID}" 
+mkdir -p "/run/xpra"
+
 chown $USER_NAME:$USER_NAME "/run/user/${USER_ID}"
 chown $USER_NAME:$USER_NAME "/run/xpra"
 
