@@ -55,7 +55,7 @@ ensure_secure_config() {
 }
 
 # install jetbrains-projector into conda enviroment
-if [ -z "$(${CONDA_BIN} env list | grep '^${CONDA_PROJECTOR_ENV} */')" ]; then
+if [ -z "$(${CONDA_BIN} env list | grep "^${CONDA_PROJECTOR_ENV} */")" ]; then
 	
 	echo "Installing conda env $CONDA_PROJECTOR_ENV"
 	chpst -u $USER_NAME $CONDA_BIN create --name $CONDA_PROJECTOR_ENV --file /etc/jetbrains-projector-requirements.txt -y
