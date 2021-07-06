@@ -25,3 +25,4 @@ chpst -u root tar xf /etc/gtk-theme.tar.gz
 
 # set default gtk2 theme for when using x2go/xfce terminal only
 chpst -u root cp -R /usr/share/themes/Ambiance-XFCE-LXDE-fixed/gtk-2.0/* /etc/gtk-2.0/.
+EOF
