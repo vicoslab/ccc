@@ -35,9 +35,14 @@ RUN apt-get clean && \
     apt-get install -y --no-install-recommends software-properties-common apt-transport-https && \
     wget -q https://xpra.org/gpg.asc -O- | apt-key add - && \
     add-apt-repository "deb https://xpra.org/ `lsb_release -cs` main" && apt-get update && \
-    apt-get install -y --no-install-recommends xpra dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput && \
+    apt-get install -y --no-install-recommends xpra dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/xpra-html5
+RUN git clone https://github.com/Xpra-org/xpra-html5 . && ./setup.py install /usr/share/xpra/www && rm -rf /tmp/xpra-html5/*
+
+ENV XPRA_PROXY_HTML5_PORT 8888
 
 #### FINAL DOCKER based on user-supplied X11_SERVER Switch  ####    
 FROM xfce4-${X11_SERVER}
@@ -45,3 +50,4 @@ LABEL maintainer "Domen Tabernik <domen.tabernik@fri.uni-lj.si>"
     
 COPY etc /etc/
 
+WORKDIR /
