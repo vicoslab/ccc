@@ -1,5 +1,14 @@
 Changes for v1.02:
- - added option to assign groups to the user through USER_GROUPS environment variable
+ - major chnages:	
+	- added new jetbrains projector image that starts projector server at default port 9999
+	- updated X11 for xpra to start HTML5 server (xpra-proxy) at default port 8888
+	
+ - minor updates:
+	- updated base image to include libs related to mesa (libxext6 libsm6 libxrender1 libgl1-mesa-glx libglu1-mesa libxt6 libxtst6 libxi6)
+	- updated base image to include tools for ssh (nano htop tmux curl) 
+	- added option to assign groups to the user through USER_GROUPS environment variable 	
+	- added jupyter token to MOTD at login
+	- minor bugfixes and code cleanup
  
 Changes for v1.01:
  
