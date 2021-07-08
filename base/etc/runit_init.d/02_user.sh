@@ -47,12 +47,43 @@ if [ "$CURRENT_HOME_OWNER" != "$USER_NAME" ]; then
     chpst -u $USER_NAME chmod 750 $USER_HOME
 fi
 
+mutex_user_lock() {
+    # wait until all other users finish
+    while [ -f "$USER_HOME/user.installing" ]; do sleep 2; done	
+    
+    # mark in file that user.installing is in installation check
+    chpst -u $USER_NAME touch "$USER_HOME/user.installing"
+}
+
+mutex_user_unlock() {
+    # clear "in installation" flag
+    chpst -u $USER_NAME rm "$USER_HOME/user.installing" 2> /dev/null
+}
+
+mutex_user_lock
+
+# install SSH keys
 if [ ! -z "${USER_PUBKEY}" ]; then
+    
     chpst -u $USER_NAME mkdir -p $USER_HOME/.ssh
     echo "${USER_PUBKEY}" | chpst -u $USER_NAME tee $USER_HOME/.ssh/authorized_keys
     chpst -u $USER_NAME chown -R $USER_NAME:$USER_NAME $USER_HOME/.ssh
 
     chpst -u $USER_NAME chmod 700 $USER_HOME/.ssh
     chpst -u $USER_NAME chmod 600 $USER_HOME/.ssh/authorized_keys
+    
 fi
 
+# create symlink to local storage for .cache files
+if [ ! -z "$LOCAL_SSD_STORAGE" ]; then    
+    USER_CACHE=$LOCAL_SSD_STORAGE/.cache
+    
+    chpst -u $USER_NAME mkdir -p $USER_CACHE
+    
+    # check if storage already exist but avoid creating if already there
+    if [ ! -f "$USER_HOME/.cache" ] || [ "$(readlink -f $USER_HOME/.cache)" != "$USER_CACHE" ]; then
+        chpst -u $USER_NAME ln -sfn $USER_CACHE $USER_HOME/.cache
+    fi
+fi
+
+mutex_user_unlock
