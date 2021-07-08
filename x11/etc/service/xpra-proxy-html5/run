@@ -3,13 +3,13 @@
 # include configuration file that should do all checks and setup variables
 . ./configure.sh
 
-echo '######################################################################################################' | tee $LOG_DIR/xpra-proxy.log
-echo '######################################### STARTED XRPA Proxy #########################################' | tee $LOG_DIR/xpra-proxy.log
+echo '######################################################################################################' #| tee $LOG_DIR/xpra-proxy.log
+echo '######################################### STARTED XRPA Proxy #########################################' #| tee $LOG_DIR/xpra-proxy.log
 exec chpst -u $USER_NAME xpra proxy :1000 \
 						--tcp-auth=allow \
 						--bind-tcp=0.0.0.0:${XPRA_PROXY_HTML5_PORT} \
 						--html=/usr/share/xpra/www \
 						--clipboard=GDK --clipboard-direction=both \
-						--bell=off --daemon=no >> $LOG_DIR/xpra-proxy.log 2>&1 
+						--bell=off --daemon=no >> $LOG_DIR/$HOSTNAME-xpra-proxy.log 2>&1 
 
 

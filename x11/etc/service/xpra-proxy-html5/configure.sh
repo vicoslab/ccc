@@ -15,4 +15,4 @@ fi
 mkdir -p $LOG_DIR
 
 # wait a few sec to ensure dbus is started
-while [ -z "$(sv status dbus | grep pid)" ] ; do sleep 3; done
+while [ -z "$(sv status dbus | grep pid)" ] ; do sleep 3; sv start dbus 2> /dev/null ; done
