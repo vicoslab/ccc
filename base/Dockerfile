@@ -19,7 +19,7 @@ RUN apt-get update --fix-missing && \
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 
 # remove any smylinkg for service which can sometimes cause issued during copy
-RUN rm -f /etc/service
+RUN rm -f /etc/service 2> /dev/null || true
 
 COPY start_runit /sbin/
 COPY etc/ /etc/
