@@ -11,10 +11,22 @@ CONDA_PROJECTOR_ENV=jetbrains-projector
 
 PROJECTOR_BIN="${CONDA_BIN} run -n ${CONDA_PROJECTOR_ENV} projector"
 
+if [ ! -z "$LOCAL_SSD_STORAGE" ]; then
+	# create symlink to local storage 
+	PROJECTOR_STORAGE=$LOCAL_SSD_STORAGE/.projector
+	
+	CREATE_PROJECTOR_STORAGE=1
+else
+	# use /home/<user>/.projector as default storage (as required by projector)
+	PROJECTOR_STORAGE=$USER_HOME/.projector
+fi
+
+
 export PROJECTOR_IDE=${PROJECTOR_IDE:-"PyCharm Professional Edition 2021.1.3"}
 export PROJECTOR_PORT=${PROJECTOR_PORT:-9999}
-export PROJECTOR_CONFIG=${PROJECTOR_CONFIG:-default}
-PROJECTOR_CONFIG_FILE=$USER_HOME/.projector/configs/$PROJECTOR_CONFIG/config.ini
+export PROJECTOR_CONFIG="${HOSTNAME}-${PROJECTOR_CONFIG:-default}"
+
+PROJECTOR_CONFIG_FILE=$PROJECTOR_STORAGE/configs/$PROJECTOR_CONFIG/config.ini
 
 ensure_secure_config() {
 
@@ -50,9 +62,27 @@ ensure_secure_config() {
 	fi
 	
 	if [ ! -z "$DO_UPDATE" ]; then
-		chpst -u $USER_NAME $PROJECTOR_BIN config rebuild
+		chpst -u $USER_NAME $PROJECTOR_BIN config rebuild $PROJECTOR_CONFIG
 	fi 
 }
+
+mutex_instalation_lock() {
+	# wait until installation flag is finished
+	while [ -f "$USER_HOME/jetbrains-projector.installing" ]; do sleep 2; done	
+	
+	# mark in file that jetbrains-projector.installing is in installation check
+	chpst -u $USER_NAME touch "$USER_HOME/jetbrains-projector.installing"
+}
+
+mutex_instalation_unlock() {
+	# clear "in installation" flag
+	chpst -u $USER_NAME rm "$USER_HOME/jetbrains-projector.installing" 2> /dev/null
+
+}
+
+echo "Waiting on mutex lock"
+mutex_instalation_lock
+echo " continuing ..." 
 
 # install jetbrains-projector into conda enviroment
 if [ -z "$(${CONDA_BIN} env list | grep "^${CONDA_PROJECTOR_ENV} */")" ]; then
@@ -63,10 +93,19 @@ if [ -z "$(${CONDA_BIN} env list | grep "^${CONDA_PROJECTOR_ENV} */")" ]; then
 	echo "  (done)"	
 fi 
 
+if [ ! -z "$CREATE_PROJECTOR_STORAGE" ]; then 
+	chpst -u $USER_NAME mkdir -p $PROJECTOR_STORAGE
+	
+	if [ ! -f "$USER_HOME/.projector" ] || [ "$(readlink -f $USER_HOME/.projector)" != "$PROJECTOR_STORAGE" ]; then
+		chpst -u $USER_NAME ln -sfn $PROJECTOR_STORAGE $USER_HOME/.projector
+	fi
+fi
+
 # put empty folder to prevent GPL question when running projector for the first time
-chpst -u $USER_NAME mkdir -p $USER_HOME/.projector/apps
-chpst -u $USER_NAME mkdir -p $USER_HOME/.projector/configs
-chpst -u $USER_NAME mkdir -p $USER_HOME/.projector/cache
+chpst -u $USER_NAME mkdir -p $PROJECTOR_STORAGE/apps
+chpst -u $USER_NAME mkdir -p $PROJECTOR_STORAGE/configs
+chpst -u $USER_NAME mkdir -p $PROJECTOR_STORAGE/cache
+
 
 if [ -z "$($PROJECTOR_BIN config list | grep " ${PROJECTOR_CONFIG}$")" ]; then
 	
@@ -78,5 +117,6 @@ if [ -z "$($PROJECTOR_BIN config list | grep " ${PROJECTOR_CONFIG}$")" ]; then
 	
 	# enable SSL and add tokens it not present
 	ensure_secure_config
-
 fi
+
+mutex_instalation_unlock

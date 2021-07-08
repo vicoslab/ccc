@@ -15,6 +15,7 @@ COPY etc /etc/
 
 WORKDIR /
 
+env LOCAL_SSD_STORAGE /storage/local/ssd
 env PROJECTOR_IDE "PyCharm Professional Edition 2021.1.3"
 env PROJECTOR_PORT 9999
 env PROJECTOR_CONFIG default

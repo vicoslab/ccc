@@ -12,7 +12,7 @@ CONDA_BIN=$USER_HOME/conda/bin/conda
 CONDA_PROJECTOR_ENV=jetbrains-projector
 
 PROJECTOR_BIN="${CONDA_BIN} run -n ${CONDA_PROJECTOR_ENV} projector"
-PROJECTOR_CONFIG=${PROJECTOR_CONFIG:-default}
+PROJECTOR_CONFIG="${HOSTNAME}-${PROJECTOR_CONFIG:-default}"
 PROJECTOR_CONFIG_FOLDER=$USER_HOME/.projector/configs/$PROJECTOR_CONFIG/
 PROJECTOR_CONFIG_FILE=$PROJECTOR_CONFIG_FOLDER/config.ini
 
@@ -60,7 +60,7 @@ ensure_secure_config() {
 	
 	# rebuild config file if changes were made
 	if [ ! -z "$DO_UPDATE" ]; then
-		chpst -u $USER_NAME $PROJECTOR_BIN config rebuild
+		chpst -u $USER_NAME $PROJECTOR_BIN config rebuild $PROJECTOR_CONFIG
 	fi 
 }
 
@@ -118,8 +118,8 @@ insert_warning_motd() {
 	# create temp file with message
 	cat > /tmp/motd.jetbrains <<- EOF
 	
-	#######################################################################
-	WARNING: JetBrains Projector IS NOT RUNNING due to missing config
+	################################################################################
+	WARNING: JetBrains Projector IS NOT RUNNING on this node due to missing config
 	
 		Please run following to fully configure: 
 			 > conda activate jetbrains-projector
@@ -130,7 +130,7 @@ insert_warning_motd() {
 			- host: 0.0.0.0
 			- port: ${PROJECTOR_PORT:-9999}
 			
-	#######################################################################
+	################################################################################
 	EOF
 
 	# insert message before "CONTAINER STATUS" line
