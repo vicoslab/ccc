@@ -4,6 +4,6 @@
 . ./configure.sh
 
 ## start projector	
-echo '######################################################################################################' | tee $LOG_DIR/projector.log
-echo '############################### STARTED JetBrains Projector ##########################################' | tee $LOG_DIR/projector.log
-exec chpst -u $USER_NAME $PROJECTOR_BIN run $PROJECTOR_CONFIG >> $LOG_DIR/projector.log 2>&1
+echo '######################################################################################################' #| tee $LOG_DIR/projector.log
+echo '############################### STARTED JetBrains Projector ##########################################' #| tee $LOG_DIR/projector.log
+exec chpst -u $USER_NAME $PROJECTOR_BIN run $PROJECTOR_CONFIG 2>&1
