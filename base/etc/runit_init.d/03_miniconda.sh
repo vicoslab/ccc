@@ -3,7 +3,10 @@
 USER_NAME=${USER_NAME:-user}
 USER_HOME=${BASE%"/"}/$USER_NAME
 
-if [ ! -f "$USER_HOME/conda/bin/conda" ] && [ ! -f "$USER_HOME/miniconda.installing" ]; then
+# wait until installation flag is finished if exists
+while [ -f "$USER_HOME/miniconda.installing" ]; do sleep 2; done	
+
+if [ ! -f "$USER_HOME/conda/bin/conda" ]; then
   # mark instalation in progress to prevent concurrent installs from containers with shared HOME
   chpst -u $USER_NAME touch "$USER_HOME/miniconda.installing"
 
