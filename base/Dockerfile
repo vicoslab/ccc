@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND noninteractive
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV BASE=/home
+env LOCAL_SSD_STORAGE /storage/local/ssd
 
 RUN apt-get update --fix-missing && \
     apt-get install -y build-essential wget bzip2 ca-certificates \
@@ -17,8 +18,11 @@ RUN apt-get update --fix-missing && \
 
 RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 
+# remove any smylinkg for service which can sometimes cause issued during copy
+RUN rm -f /etc/service
+
 COPY start_runit /sbin/
-COPY etc /etc/
+COPY etc/ /etc/
 
 EXPOSE 22
 LABEL frp.enabled="true" frp.22="tcp"
