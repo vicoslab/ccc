@@ -16,10 +16,6 @@ PROJECTOR_CONFIG="${HOSTNAME}-${PROJECTOR_CONFIG:-default}"
 PROJECTOR_CONFIG_FOLDER=$USER_HOME/.projector/configs/$PROJECTOR_CONFIG/
 PROJECTOR_CONFIG_FILE=$PROJECTOR_CONFIG_FOLDER/config.ini
 
-LOG_DIR=$USER_HOME/.projector
-
-mkdir -p $LOG_DIR
-
 #####################################################################################
 # function defines
 
@@ -30,10 +26,17 @@ ensure_secure_config() {
 	# find authentication token (should be in section [PASSWORDS] and starts with 'password = ')
 	AUTH_TOKEN=$(grep -o "^password = .*" $PROJECTOR_CONFIG_FILE | cut -f2- -d=)
 	
-	# if auth token not configure then create new one
+	# get user requested token if specified
+	USER_REQUESTED_TOKEN=$(cat $HOME/jetbrains-projector.token 2> /dev/null || echo "")
+	
+	# if auth token not configured then create new one
 	if [ -z "$AUTH_TOKEN" ]; then
-		AUTH_TOKEN=`date +%s | sha256sum | base64 | head -c 64`
-		
+		# use user token if present
+		if [ -z "$USER_REQUESTED_TOKEN" ] ; then
+			AUTH_TOKEN=`date +%s | sha256sum | base64 | head -c 64`
+		else
+			AUTH_TOKEN=$USER_REQUESTED_TOKEN
+		fi
 		cat >> $PROJECTOR_CONFIG_FILE <<- EOF
 		[PASSWORDS]
 		password = $AUTH_TOKEN
@@ -41,6 +44,10 @@ ensure_secure_config() {
 		EOF
 		
 		DO_UPDATE=1
+	elif [ "$USER_REQUESTED_TOKEN" != "$AUTH_TOKEN" ] ; then
+		# password already present but user requested different one so change it
+		sed -i "s/password = .*/password = ${USER_REQUESTED_TOKEN}/g" $PROJECTOR_CONFIG_FILE
+		sed -i "s/ro_password = .*/ro_password = ${USER_REQUESTED_TOKEN}/g" $PROJECTOR_CONFIG_FILE
 	fi
 	
 	# find SSL token (should be in section [SSL] and starts with 'token = ')
@@ -95,7 +102,7 @@ add_auth_token_motd() {
 clenup_previous_run() {
 
 	# need to manually kill java app for projector 
-	pkill -f "${USER_HOME}/.projector/apps/.*/java.*" 2> /dev/null || echo ""
+	pkill -f ".*/.projector/apps/.*/java.*" 2> /dev/null || echo ""
 
 	# also clear the lock flag
 	rm "$PROJECTOR_CONFIG_FOLDER/run.lock" 2> /dev/null || echo ""
@@ -151,7 +158,7 @@ clenup_previous_run
 ## check if valid configuration for projector exists
 if [  -z "$($PROJECTOR_BIN config list | grep $PROJECTOR_CONFIG)" ]; then
 
-	# insert warning into MOTD if not present jet
+	# insert warning into MOTD if not present yet
 	if [ -z "$(grep 'JetBrains Projector IS NOT RUNNING' /etc/motd)" ]; then
 		insert_warning_motd
 	fi
