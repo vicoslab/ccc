@@ -13,7 +13,7 @@ PROJECTOR_BIN="${CONDA_BIN} run -n ${CONDA_PROJECTOR_ENV} projector"
 
 if [ ! -z "$LOCAL_SSD_STORAGE" ]; then
 	# create symlink to local storage 
-	PROJECTOR_STORAGE=$LOCAL_SSD_STORAGE/.projector
+	PROJECTOR_STORAGE=$LOCAL_SSD_STORAGE/$CONTAINER_NAME/.projector
 	
 	CREATE_PROJECTOR_STORAGE=1
 else
