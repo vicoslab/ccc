@@ -48,6 +48,8 @@ ensure_secure_config() {
 		# password already present but user requested different one so change it
 		sed -i "s/password = .*/password = ${USER_REQUESTED_TOKEN}/g" $PROJECTOR_CONFIG_FILE
 		sed -i "s/ro_password = .*/ro_password = ${USER_REQUESTED_TOKEN}/g" $PROJECTOR_CONFIG_FILE
+		
+		DO_UPDATE=1
 	fi
 	
 	# find SSL token (should be in section [SSL] and starts with 'token = ')
