@@ -82,12 +82,17 @@ if [ ! -z "$LOCAL_SSD_STORAGE" ]; then
     
     # check if existing folder is not symlink but actual folder -- rename it in case user has something important there
     if [ -d "$USER_HOME/.cache" ] && [ ! -h "$USER_HOME/.cache" ] ; then
-        chpst -u $USER_NAME mv "$USER_HOME/.cache" "$USER_HOME/.cache_backup"
+        RANDOM_SUFFIX=$(date +%s | sha256sum | base64 | head -c 4)
+        chpst -u $USER_NAME mv "$USER_HOME/.cache" "$USER_HOME/.cache_backup_$RANDOM_SUFFIX"
+        
+        echo "Renamed existing $USER_HOME/.cache folder  into $USER_HOME/.cache_backup_$RANDOM_SUFFIX"
     fi
     
     # check if storage already exist but avoid creating if already there
     if [ ! -f "$USER_HOME/.cache" ] || [ "$(readlink -f $USER_HOME/.cache)" != "$USER_CACHE" ]; then
         chpst -u $USER_NAME ln -sfn $USER_CACHE $USER_HOME/.cache
+        
+        echo "Created symlink $USER_HOME/.cache -> $USER_CACHE"
     fi
 fi
 
