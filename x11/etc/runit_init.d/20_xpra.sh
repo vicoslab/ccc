@@ -11,6 +11,7 @@ mkdir -p "/run/xpra"
 
 chown $USER_NAME:$USER_NAME "/run/user/${USER_ID}"
 chown $USER_NAME:$USER_NAME "/run/xpra"
+chown $USER_NAME:$USER_NAME "$HOME/.xpra"
 
 cat >/usr/local/bin/krusader-x11 << EOF
 #!/bin/bash 
