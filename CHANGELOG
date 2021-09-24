@@ -1,3 +1,6 @@
+Changes for v1.03:
+ - minor updates:
+        - added ~/.services folder as symlink to allow simultainous running of user services on multiple machines
 Changes for v1.02:
  - major chnages:	
 	- added new jetbrains projector image that starts projector server at default port 9999
