@@ -21,5 +21,21 @@ EOF
 
 chmod +x /usr/local/bin/krusader-x11
 
+
+cat > /usr/share/xpra/www/default-settings.txt << EOF
+# Xpra HTML5 default settings
+#
+# ie:
+# port = 10000
+# keyboard_layout = gb
+# encoding = auto
+# bandwidth_limit = 10000000
+# debug_keyboard = true
+username = $USER_NAME
+password = $USER_NAME
+ssl = true
+EOF
+
+
 echo "XPRA configuration completed."
 
