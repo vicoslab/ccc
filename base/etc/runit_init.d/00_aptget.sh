@@ -1,5 +1,8 @@
 #!/bin/bash -e
 
+# make sure to install latest certificates in case root certificases have changed since docker was built
+apt-get update || echo "Update did not finish successfully but continuing"
+apt-get install -y ca-certificates
 
 if [ ! -z "$INSTALL_PACKAGES" ]; then
 
