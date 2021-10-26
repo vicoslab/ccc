@@ -35,12 +35,12 @@ RUN apt-get clean && \
     apt-get install -y --no-install-recommends software-properties-common apt-transport-https && \
     wget -q https://xpra.org/gpg.asc -O- | apt-key add - && \
     add-apt-repository "deb https://xpra.org/ `lsb_release -cs` main" && apt-get update && \
-    apt-get install -y --no-install-recommends xpra dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify && \
+    apt-get install -y --no-install-recommends xpra=4.2.2-r0-1 dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/xpra-html5
-RUN git clone https://github.com/Xpra-org/xpra-html5 . && ./setup.py install /usr/share/xpra/www && rm -rf /tmp/xpra-html5/*
+RUN git clone --branch v4.5.1 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install /usr/share/xpra/www && rm -rf /tmp/xpra-html5/*
 
 ENV XPRA_PROXY_HTML5_PORT 8888
 
