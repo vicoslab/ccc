@@ -3,7 +3,7 @@
 mkdir -p /var/run/dbus
 
 # clear any old dbug pids
-rm /var/run/dbus/pid 2> /dev/null
+rm -f /var/run/dbus/pid 2> /dev/null
 
 exec /usr/bin/dbus-daemon --system --nofork 2>&1
 
