@@ -28,7 +28,7 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # disable XPRA service since it is not installed
-RUN touch /etc/service/xpra-proxy-html5/down
+RUN mkdir -p /etc/service/xpra-proxy-html5 && touch /etc/service/xpra-proxy-html5/down
 
 #### XFCE4 with Xpra ####
 FROM xfce4-base as xfce4-xpra
