@@ -34,8 +34,8 @@ jobs:
             TAG: ubuntu20.04-cuda11.5.0
           - ROOT_IMAGE: nvidia/cuda:11.7.0-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda11.7.0
-          - ROOT_IMAGE: nvidia/cuda:11.7.0-devel-ubuntu22.04
-            TAG: ubuntu22.04-cuda11.7.0
+#          - ROOT_IMAGE: nvidia/cuda:11.7.0-devel-ubuntu22.04
+#            TAG: ubuntu22.04-cuda11.7.0
           
     steps:
     - name: Get tag name
