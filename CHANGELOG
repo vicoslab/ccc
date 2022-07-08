@@ -1,3 +1,18 @@
+Changes for v1.06:
+ - minor updates:
+        - fixed bug when existing public key were overriden
+        - added CUDA_DEVICE_ORDER=PCI_BUS_ID to ensure order of devices will match nvidia-smi
+        - added CUDA_VISIBLE_DEVICES=-1 to disable visibility of devices by default and forcing users to properly set them
+Changes for v1.05:
+ - minor updates:
+        - upgraded cuda images to latest version with new GPG key
+        - enabled ignoring of errors during apt key update in case GPG keys of any existing packages changes
+        - bug fixes for jupyter and x2go/xpra for compatibility with latest packages
+Changes for v1.04:
+ - minor updates:
+        - added installation of latest ca-certificate upon start
+        - added default user/pass for xpra html5 server
+
 Changes for v1.03:
  - minor updates:
         - added ~/.services folder as symlink to allow simultainous running of user services on multiple machines
