@@ -66,7 +66,11 @@ mutex_user_lock
 if [ ! -z "${USER_PUBKEY}" ]; then
     
     chpst -u $USER_NAME mkdir -p $USER_HOME/.ssh
-    echo "${USER_PUBKEY}" | chpst -u $USER_NAME tee $USER_HOME/.ssh/authorized_keys
+    # add provided public key if not present yet
+    if ! grep -Fxq "${USER_PUBKEY}" $USER_HOME/.ssh/authorized_keys ;  then
+        echo "Adding SSH public key:"
+        echo "${USER_PUBKEY}" | chpst -u $USER_NAME tee -a $USER_HOME/.ssh/authorized_keys
+    fi
     chpst -u $USER_NAME chown -R $USER_NAME:$USER_NAME $USER_HOME/.ssh
 
     chpst -u $USER_NAME chmod 700 $USER_HOME/.ssh
