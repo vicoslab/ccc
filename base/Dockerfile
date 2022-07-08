@@ -27,8 +27,10 @@ COPY etc/ /etc/
 EXPOSE 22
 LABEL frp.enabled="true" frp.22="tcp"
 
-ENV CUDA_DEVICE_ORDER PCI_BUS_ID	# Fixed CUDA device order
-ENV CUDA_VISIBLE_DEVICES -1			# Disable device visibility by default
+# Fixed CUDA device order to match nvidia-smi order
+ENV CUDA_DEVICE_ORDER PCI_BUS_ID
+# Disable device visibility by default
+ENV CUDA_VISIBLE_DEVICES -1
 
 
 ENTRYPOINT ["/sbin/start_runit"]
