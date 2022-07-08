@@ -27,5 +27,9 @@ COPY etc/ /etc/
 EXPOSE 22
 LABEL frp.enabled="true" frp.22="tcp"
 
+ENV CUDA_DEVICE_ORDER PCI_BUS_ID	# Fixed CUDA device order
+ENV CUDA_VISIBLE_DEVICES -1			# Disable device visibility by default
+
+
 ENTRYPOINT ["/sbin/start_runit"]
 
