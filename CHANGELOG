@@ -1,3 +1,8 @@
+Changes for v1.07:
+ - minor updates:
+        - fixed bug when install latest version of miniconda (invalid arg used in conda clean)
+        - added mamba by default during miniconda install
+
 Changes for v1.06:
  - minor updates:
         - fixed bug when existing public key were overriden
