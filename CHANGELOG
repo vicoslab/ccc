@@ -1,3 +1,6 @@
+Changes for v1.08:
+ - bugfix for compatability with latest conda
+ 
 Changes for v1.07:
  - minor updates:
         - fixed bug when install latest version of miniconda (invalid arg used in conda clean)
