@@ -78,21 +78,21 @@ jobs:
         cache_froms: vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
 
-    - name: Build and push jupyter CCC image
-      uses: docker/build-push-action@v1.1.0
-      #env:        
-      #    DOCKER_BUILDKIT: 1
-      # NOTE: Cannot use DOCKER_BUILDKIT=1 since build will fail due to bugs in buildkit when copying nested folders-
-      #       Need to wait for buildkit fix before enabling this        
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        repository: vicoslab/ccc
-        path: jupyter
-        tags: jupyter-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jupyter-latest-${{ matrix.TAG }}
-        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
-        cache_froms: vicoslab/ccc:jupyter-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
-        always_pull: true
+    # - name: Build and push jupyter CCC image
+    #   uses: docker/build-push-action@v1.1.0
+    #   #env:        
+    #   #    DOCKER_BUILDKIT: 1
+    #   # NOTE: Cannot use DOCKER_BUILDKIT=1 since build will fail due to bugs in buildkit when copying nested folders-
+    #   #       Need to wait for buildkit fix before enabling this        
+    #   with:
+    #     username: ${{ secrets.DOCKER_USERNAME }}
+    #     password: ${{ secrets.DOCKER_PASSWORD }}
+    #     repository: vicoslab/ccc
+    #     path: jupyter
+    #     tags: jupyter-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jupyter-latest-${{ matrix.TAG }}
+    #     build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
+    #     cache_froms: vicoslab/ccc:jupyter-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
+    #     always_pull: true
 
     - name: Build and push X11 CCC image
       uses: docker/build-push-action@v1.1.0
@@ -126,7 +126,23 @@ jobs:
         cache_froms: vicoslab/ccc:xpra-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
 
-    - name: Build and push jetbrains-projector CCC image
+    # - name: Build and push jetbrains-projector CCC image
+    #   uses: docker/build-push-action@v1.1.0
+    #   #env:
+    #   #    DOCKER_BUILDKIT: 1
+    #   # NOTE: Cannot use DOCKER_BUILDKIT=1 since build will fail due to bugs in buildkit when copying nested folders-
+    #   #       Need to wait for buildkit fix before enabling this       
+    #   with:
+    #     username: ${{ secrets.DOCKER_USERNAME }}
+    #     password: ${{ secrets.DOCKER_PASSWORD }}
+    #     repository: vicoslab/ccc
+    #     path: jetbrains-projector
+    #     tags: jetbrains-projector-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jetbrains-projector-latest-${{ matrix.TAG }}
+    #     build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:xpra-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
+    #     cache_froms: vicoslab/ccc:jetbrains-projector-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
+    #     always_pull: true
+
+    - name: Build and push VS Code CCC image
       uses: docker/build-push-action@v1.1.0
       #env:
       #    DOCKER_BUILDKIT: 1
@@ -136,8 +152,8 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         repository: vicoslab/ccc
-        path: jetbrains-projector
-        tags: jetbrains-projector-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jetbrains-projector-latest-${{ matrix.TAG }}
-        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:xpra-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
-        cache_froms: vicoslab/ccc:jetbrains-projector-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
+        path: vscode
+        tags: vscode-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},vscode-latest-${{ matrix.TAG }}
+        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
+        cache_froms: vicoslab/ccc:vscode-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
