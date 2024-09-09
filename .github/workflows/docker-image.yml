@@ -29,22 +29,31 @@ jobs:
           - ROOT_IMAGE: nvidia/cuda:11.2.2-cudnn8-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda11.2.2         
           - ROOT_IMAGE: nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04
-            TAG: ubuntu20.04-cuda11.3.0
+            TAG: ubuntu20.04-cuda11.3.1
           - ROOT_IMAGE: nvidia/cuda:11.5.2-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda11.5.2
           - ROOT_IMAGE: nvidia/cuda:11.7.1-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda11.7.0
-#          - ROOT_IMAGE: nvidia/cuda:11.7.0-devel-ubuntu22.04
-#            TAG: ubuntu22.04-cuda11.7.0
           - ROOT_IMAGE: nvidia/cuda:11.8.0-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda11.8.0
           - ROOT_IMAGE: nvidia/cuda:12.0.0-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda12.0.0
           - ROOT_IMAGE: nvidia/cuda:12.1.0-devel-ubuntu20.04
             TAG: ubuntu20.04-cuda12.1.0
-          - ROOT_IMAGE: nvidia/cuda:12.2.0-devel-ubuntu20.04
-            TAG: ubuntu20.04-cuda12.2.0
-          
+          - ROOT_IMAGE: nvidia/cuda:12.2.2-devel-ubuntu20.04
+            TAG: ubuntu20.04-cuda12.2.2
+          - ROOT_IMAGE: nvidia/cuda:12.3.2-devel-ubuntu22.04
+            TAG: ubuntu22.04-cuda12.3.2
+          - ROOT_IMAGE: nvidia/cuda:12.4.1-devel-ubuntu22.04
+            TAG: ubuntu22.04-cuda12.4.1
+          - ROOT_IMAGE: nvidia/cuda:12.5.1-devel-ubuntu22.04
+            TAG: ubuntu22.04-cuda12.5.1
+          - ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu22.04
+            TAG: ubuntu22.04-cuda12.6.1
+          - ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu24.04
+            TAG: ubuntu24.04-cuda12.6.1
+
+
     steps:
     - name: Get tag name
       id: get_tag_name

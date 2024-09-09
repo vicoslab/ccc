@@ -34,10 +34,17 @@ Optional environmental variables used to provide info at login
  * CONTAINER_IMAGE: docker image that is running
  * CONTAINER_WELCOME_MSG: custom login text at the end
 
+VS Code
+-------
+
+Extends base image and installs a VS Code IDE. It starts `code serve-web` service on default port 9999 (or one specifided in VSCODE_PORT env var). The instance is protected using a token that is saved in file `~/vscode.token`.
+
+
 Jupyter
 -------
 
 Extends base image, contains a Jupyter instance that is run at startup. The instance is protected using a token that is saved in file `~/jupyter.token`.
+
 
 
 X11 support with XFCE4 and X2Go
