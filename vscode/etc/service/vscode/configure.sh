@@ -112,7 +112,7 @@ retrieve_or_generate_auth_token() {
 # check if VSCODE binary is valid otherwise disable the service
 $VSCODE_CLI_BIN --version && VSCODE_VALID=1 || VSCODE_VALID=0
 
-if [ $VSCODE_VALID ] ; then
+if [ "$VSCODE_VALID" = 0 ] ; then
     # VS CODE CLI not valid - disabling the service
 
     DIR="$(cd "$(dirname "$0")" && pwd)"
