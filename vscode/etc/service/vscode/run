@@ -15,6 +15,6 @@ exec $VSCODE_BIN \
         --extensions-dir=$VSCODE_DATA_FOLDERS/extensions &
 
 # save PID of server and wait to finish
-mkdir ./supervise
+mkdir -p ./supervise
 echo $! > ./supervise/pid_vscode_serve
 wait $!        
