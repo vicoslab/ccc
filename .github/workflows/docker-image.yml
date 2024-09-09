@@ -50,8 +50,8 @@ jobs:
             TAG: ubuntu22.04-cuda12.5.1
           - ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu22.04
             TAG: ubuntu22.04-cuda12.6.1
-          - ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu24.04
-            TAG: ubuntu24.04-cuda12.6.1
+          #- ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu24.04
+          #  TAG: ubuntu24.04-cuda12.6.1
 
 
     steps:
