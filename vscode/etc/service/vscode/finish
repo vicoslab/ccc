@@ -1,0 +1,7 @@
+#!/bin/sh -e
+
+# Read the PID from the file
+pid=$(cat supervise/pid_vscode_serve)
+
+# Kill the process
+pkill -P "$pid"

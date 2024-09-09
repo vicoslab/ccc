@@ -1,0 +1,19 @@
+#!/bin/sh -e
+
+# include configuration file that should do all checks and setup variables
+. ./configure.sh
+
+## start VS CODE	
+echo '################################################################################################'
+echo '############################### STARTED VS CODE SERVE ##########################################' 
+exec $VSCODE_BIN \
+        --host 0.0.0.0 --port $VSCODE_PORT \
+        --connection-token $VSCODE_TOKEN \
+        --telemetry-level off --accept-server-license-terms \
+        --server-data-dir=$VSCODE_DATA_FOLDERS \
+        --user-data-dir=$VSCODE_DATA_FOLDERS/data/ \
+        --extensions-dir=$VSCODE_DATA_FOLDERS/extensions &
+
+# save PID of server and wait to finish
+echo $! > supervise/pid_vscode_serve
+wait $!        
