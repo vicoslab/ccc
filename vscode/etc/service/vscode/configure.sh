@@ -148,3 +148,6 @@ VSCODE_VERSION=$(find "$VSCODE_CLI_SERVE" -mindepth 1 -maxdepth 1 -type d -print
 # variables for running
 VSCODE_BIN=$VSCODE_VERSION/bin/code-server$BIN_SUFFIX
 VSCODE_SERVER_DATA_DIR=$HOME/.vscode-server$BIN_SUFFIX
+
+# make dir VSCODE_SERVER_DATA_DIR
+chpst -u $USER_NAME mkdir -p $VSCODE_SERVER_DATA_DIR
