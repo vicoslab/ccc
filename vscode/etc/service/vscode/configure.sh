@@ -41,8 +41,8 @@ download_vscode() {
     # randomly generate connection token only for download
     VSCODE_DL_TOKEN=`date +%s | sha256sum | base64 | head -c 64`
 
-    # Run code serve-web directly in the background
-    $VSCODE_CLI_BIN serve-web --connection-token=$VSCODE_DL_TOKEN &
+    # Run code serve-web directly in the background, but with approprite user
+    chpst -u $USER_NAME $VSCODE_CLI_BIN serve-web --connection-token=$VSCODE_DL_TOKEN &
 
     # Capture the PID of the serve-web process
     SERVE_WEB_PID=$!
@@ -110,7 +110,7 @@ retrieve_or_generate_auth_token() {
 # main checks and configuration
 
 # check if VSCODE binary is valid otherwise disable the service
-$VSCODE_CLI_BIN --version && VSCODE_VALID=1 || VSCODE_VALID=0
+chpst -u $USER_NAME $VSCODE_CLI_BIN --version && VSCODE_VALID=1 || VSCODE_VALID=0
 
 if [ "$VSCODE_VALID" = 0 ] ; then
     # VS CODE CLI not valid - disabling the service
