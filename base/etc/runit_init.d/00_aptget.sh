@@ -1,5 +1,8 @@
 #!/bin/bash -e
 
+# create cache folder for apt to avoid crash issues during cleanup with missing files (should be tested)
+mkdir -p /var/cache/apt/archives/partial
+
 # make sure to install latest certificates in case root certificases have changed since docker was built
 apt-get update || echo "Update did not finish successfully, but could be just updated GPG key so continuing"
 apt-get install -y ca-certificates
