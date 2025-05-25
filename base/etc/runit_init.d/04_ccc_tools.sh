@@ -27,7 +27,7 @@ if [ "$INSTALLED" = 1 ]; then
     # instally symlink to ccc binary in conda to system path
     CCC_BIN=$(chpst -u $USER_NAME $CONDA_BIN run -n $CCC_TOOLS_ENV which ccc)
 
-    ln -s $CCC_BIN /usr/bin/ccc
+    ln -sf $CCC_BIN /usr/bin/ccc
 
     echo "  (done)"	
 else
