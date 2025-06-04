@@ -78,21 +78,22 @@ jobs:
         cache_froms: vicoslab/ccc:base-latest-${{ matrix.TAG }}
         always_pull: true
 
-    # - name: Build and push jupyter CCC image
-    #   uses: docker/build-push-action@v1.1.0
-    #   #env:        
-    #   #    DOCKER_BUILDKIT: 1
-    #   # NOTE: Cannot use DOCKER_BUILDKIT=1 since build will fail due to bugs in buildkit when copying nested folders-
-    #   #       Need to wait for buildkit fix before enabling this        
-    #   with:
-    #     username: ${{ secrets.DOCKER_USERNAME }}
-    #     password: ${{ secrets.DOCKER_PASSWORD }}
-    #     repository: vicoslab/ccc
-    #     path: jupyter
-    #     tags: jupyter-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jupyter-latest-${{ matrix.TAG }}
-    #     build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
-    #     cache_froms: vicoslab/ccc:jupyter-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
-    #     always_pull: true
+    - name: Build and push jupyter CCC image
+      if: contains(matrix.TAG, 'ubuntu22.04') # jupyter does not build for newer versions any more, so from v1.09 we build it only for ubuntu 22.04
+      uses: docker/build-push-action@v1.1.0
+      #env:        
+      #    DOCKER_BUILDKIT: 1
+      # NOTE: Cannot use DOCKER_BUILDKIT=1 since build will fail due to bugs in buildkit when copying nested folders-
+      #       Need to wait for buildkit fix before enabling this        
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        repository: vicoslab/ccc
+        path: jupyter
+        tags: jupyter-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG }},jupyter-latest-${{ matrix.TAG }}
+        build_args: BUILDKIT_INLINE_CACHE=1,ROOT_IMAGE=vicoslab/ccc:base-${{ steps.get_tag_name.outputs.VERSION }}-${{ matrix.TAG  }}
+        cache_froms: vicoslab/ccc:jupyter-latest-${{ matrix.TAG }},vicoslab/ccc:base-latest-${{ matrix.TAG }}
+        always_pull: true
 
     - name: Build and push X11 CCC image
       uses: docker/build-push-action@v1.1.0
