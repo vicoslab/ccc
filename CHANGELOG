@@ -1,3 +1,11 @@
+Changes for v1.11:
+ - bugfixed: modified ccc-tools install to atomic operations (wait for install to finish from other containers)
+
+Changes for v1.10:
+ - bug fixes:
+        - ccc-tools issues when restarting container
+        - apt install issues in post-script cleanup
+
 Changes for v1.09:
  - major chnages:	
         - added ccc-tools (https://github.com/vicoslab/ccc-tools) to base image
