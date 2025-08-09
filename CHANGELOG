@@ -1,5 +1,8 @@
 Changes for v1.11:
- - bugfixed: modified ccc-tools install to atomic operations (wait for install to finish from other containers)
+ - bugfixes: 
+        - modified ccc-tools install to atomic operations (wait for install to finish from other containers)
+        - added CCC_TOOLS_ENABLE env to disable ccc-tools installation
+        - updated xpra to latest LTS version 5.1.1-r0-1
 
 Changes for v1.10:
  - bug fixes:
