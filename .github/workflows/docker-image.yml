@@ -112,6 +112,7 @@ jobs:
         always_pull: true
 
     - name: Build and push xpra CCC image
+      if: contains(matrix.TAG, 'ubuntu22.04') || contains(matrix.TAG, 'ubuntu24.04') # XPRA PPA does not build for 20.04 version any more, so from v1.11 we build it only for ubuntu 22.04 or newer
       uses: docker/build-push-action@v1.1.0
       #env:
       #    DOCKER_BUILDKIT: 1
