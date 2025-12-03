@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+logfile="$LOG_DIR/${CONTAINER_NODE:-startup}.log"
+mkdir -p "$LOG_DIR"
+truncate --size=0 "$logfile"
+start_runit > >(tee -a "$logfile") 2> >(tee -a "$logfile" >&2)
