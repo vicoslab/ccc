@@ -32,7 +32,6 @@ LABEL frp.enabled="true" frp.22="tcp"
 ENV CUDA_DEVICE_ORDER PCI_BUS_ID
 # Disable device visibility by default
 ENV CUDA_VISIBLE_DEVICES -1
-ENV LOG_DIR /storage/user/container-settings/logs
 
 
 ENTRYPOINT ["/sbin/start_wrapped"]

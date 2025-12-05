@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 
-logfile="$LOG_DIR/${CONTAINER_NODE:-startup}.log"
+USER_NAME=${USER_NAME:-user}
+LOG_DIR=${LOG_DIR:-/home/$USER_NAME/.containers/logs}
+LOG_FILE="$LOG_DIR/${CONTAINER_NODE:-startup}.log"
 mkdir -p "$LOG_DIR"
-truncate --size=0 "$logfile"
-start_runit > >(tee -a "$logfile") 2> >(tee -a "$logfile" >&2)
+truncate --size=0 "$LOG_FILE"
+start_runit > >(tee -a "$LOG_FILE") 2> >(tee -a "$LOG_FILE" >&2)
