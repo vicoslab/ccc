@@ -22,6 +22,7 @@ RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
 RUN rm -f /etc/service 2> /dev/null || true
 
 COPY start_runit /sbin/
+COPY start_wrapped /sbin/
 COPY etc/ /etc/
 
 EXPOSE 22
@@ -33,5 +34,5 @@ ENV CUDA_DEVICE_ORDER PCI_BUS_ID
 ENV CUDA_VISIBLE_DEVICES -1
 
 
-ENTRYPOINT ["/sbin/start_runit"]
+ENTRYPOINT ["/sbin/start_wrapped"]
 

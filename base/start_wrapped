@@ -1,0 +1,29 @@
+#! /usr/bin/env bash
+
+USER_NAME=${USER_NAME:-user}
+USER_HOME=${BASE%"/"}/$USER_NAME
+
+LOG_DIR=${LOG_DIR:-"$USER_HOME/.containers/logs"}
+LOG_FILE="$LOG_DIR/${CONTAINER_NODE:-startup}.log"
+LOG_LINES=${LOG_LINES:-2000}
+
+tee_first_n() {
+    local n="$1"
+    local log="$2"
+    local header="$3"
+    local count=0
+    while IFS= read -r line; do
+        if (( count < n )); then
+            echo "$header" "$line" >> "$log"
+            ((count++))
+            if (( count == n)); then
+                echo "$header" "Output truncated at '$LOG_LINES'. Set LOG_LINES to increase limit." >> "$log"
+            fi
+        fi
+        echo "$line"
+    done
+}
+
+mkdir -p "$LOG_DIR"
+truncate --size=0 "$LOG_FILE"
+start_runit > >(tee_first_n $LOG_LINES "$LOG_FILE" "[O]") 2> >(tee_first_n $LOG_LINES "$LOG_FILE" "[W]" >&2)

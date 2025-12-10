@@ -8,18 +8,7 @@ USER_PUBKEY=${USER_PUBKEY}
 
 USER_HOME=${BASE%"/"}/$USER_NAME
 
-set +e
-getent passwd $USER_NAME > /dev/null
-EXISTS=$?
-set -e
-
-if [ $EXISTS != 0 ]; then
-    adduser --uid=$USER_ID --home=$USER_HOME --disabled-password --gecos "" $USER_NAME
-
-    # copy default profile files if they do not exist yet
-    # (cannot use -m from adduser since folder many already exist due to mounting)
-    chpst -u $USER_NAME cp -r -n /etc/skel/. $USER_HOME/.
-fi
+getent passwd $USER_NAME || adduser --uid=$USER_ID --home=$USER_HOME --disabled-password --gecos "" $USER_NAME
 
 if [ ! -z "${USER_GROUPS}" ]; then
     # split groups into list using ',' as separator
@@ -46,6 +35,9 @@ if [ "$CURRENT_HOME_OWNER" != "$USER_NAME" ]; then
     chown $USER_NAME:$USER_NAME $USER_HOME
     chpst -u $USER_NAME chmod 750 $USER_HOME
 fi
+# copy default profile files if they do not exist yet
+# (cannot use -m from adduser since folder many already exist due to mounting)
+chpst -u $USER_NAME cp -r -n /etc/skel/. $USER_HOME/.
 
 mutex_user_lock() {
     # wait until all other users finish
