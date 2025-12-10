@@ -38,7 +38,7 @@ RUN apt-get clean && \
     apt-get install -y --no-install-recommends software-properties-common apt-transport-https && \
     wget -q https://xpra.org/gpg.asc -O- | apt-key add - && \
     add-apt-repository "deb https://xpra.org/lts `lsb_release -cs` main" && apt-get update && \
-    apt-get install -y --no-install-recommends xpra=5.1.1-r0-1 dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
+    apt-get install -y --no-install-recommends xpra=5.1.4-r0-1 dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 
