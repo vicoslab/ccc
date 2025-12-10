@@ -1,3 +1,7 @@
+Changes for v1.12:
+ - minor update:
+		- implemented logging to /home/$USER/.containers/
+
 Changes for v1.11:
  - bugfixes: 
         - modified ccc-tools install to atomic operations (wait for install to finish from other containers)
