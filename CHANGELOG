@@ -1,6 +1,9 @@
 Changes for v1.12:
  - minor update:
-		- implemented logging to /home/$USER/.containers/
+	- implemented logging to /home/$USER/.containers/
+	- fixed XPRA version for Ubuntu22.04
+	- depricated Ubuntu20.04 build
+	- added CUDA 13
 
 Changes for v1.11:
  - bugfixes: 
