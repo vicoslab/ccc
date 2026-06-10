@@ -34,6 +34,20 @@ Optional environmental variables used to provide info at login
  * CONTAINER_IMAGE: docker image that is running
  * CONTAINER_WELCOME_MSG: custom login text at the end
 
+FUSE support
+---------------------------
+
+All CCC images support FUSE through [`ccc-fuse-sidecar`](https://github.com/vicoslab/ccc-fuse-sidecar) so compute containers do not need
+privileged access or `SYS_ADMIN`. For this to work, the CCC container needs the
+sidecar socket directory mounted at `/run/ccc-fuse-sidecar` (for
+`fuse.sock`) and `/dev/fuse` mapped as a device for libfuse compatibility:
+
+```bash
+--device /dev/fuse:/dev/fuse:rw
+```
+
+You do not need `--privileged` or app-side `--cap-add SYS_ADMIN`.
+
 VS Code
 -------
 
