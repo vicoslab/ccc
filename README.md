@@ -38,12 +38,20 @@ FUSE support
 ---------------------------
 
 All CCC images support FUSE through [`ccc-fuse-sidecar`](https://github.com/vicoslab/ccc-fuse-sidecar) so compute containers do not need
-privileged access or `SYS_ADMIN`. For this to work, the CCC container needs the
-sidecar socket directory mounted at `/run/ccc-fuse-sidecar` (for
-`fuse.sock`) and `/dev/fuse` mapped as a device for libfuse compatibility:
+privileged access or `SYS_ADMIN`. The image includes a static `fusermount3` shim
+under `/opt/ccc-fuse-sidecar/bin` and relinks `fusermount3`/`fusermount` helper
+names during startup. The shim reads `CONTAINER_NAME` from the container
+environment and forwards it to the sidecar, allowing Docker-inspect path
+translation to identify the calling compute container.
+
+For this to work, the CCC deployment must provide the runtime pieces, not the
+image itself:
 
 ```bash
 --device /dev/fuse:/dev/fuse:rw
+-v /run/ccc-fuse-sidecar/<container>:/run/ccc-fuse-sidecar:rw
+--label ccc.fuse=enabled
+-e CONTAINER_NAME=<container-name>
 ```
 
 You do not need `--privileged` or app-side `--cap-add SYS_ADMIN`.
