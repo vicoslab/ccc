@@ -4,6 +4,27 @@ Conda Compute Containers
 Contains build files for containers that use Conda in users directory (mounted as a persistent volume) for further package installation. The image itself is not writeable by the user.
 Images also contain basic labels that are used to configure FRP port proxying.
 
+Manual development image builds
+-------------------------------
+
+The repository contains a manual-only GitHub Actions workflow named `Docker Dev Image CI` for testing a single CCC image without publishing release/latest tags. Run it from the GitHub Actions UI and choose exactly one `image` to build. The default is `base`.
+
+Example base image run:
+
+ * `image`: `base`
+ * `root_image`: `nvidia/cuda:13.0.2-devel-ubuntu22.04`
+ * `tag`: `ubuntu22.04-cuda13.0.2`
+
+The workflow pushes one development tag to Docker Hub using the configured `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets:
+
+ * `vicoslab/ccc:base-dev-<tag>`
+ * `vicoslab/ccc:jupyter-dev-<tag>` for Ubuntu 22.04 tags, when `image` is `jupyter`
+ * `vicoslab/ccc:x2go-dev-<tag>` when `image` is `x2go`
+ * `vicoslab/ccc:xpra-dev-<tag>` for Ubuntu 22.04/24.04 tags, when `image` is `xpra`
+ * `vicoslab/ccc:vscode-dev-<tag>` when `image` is `vscode`
+
+For non-base images, `root_image` should be the parent CCC base image to extend, such as `vicoslab/ccc:base-dev-ubuntu22.04-cuda13.0.2`. The workflow is intentionally configured only with `workflow_dispatch`, so it does not run on pushes, pull requests, or tags.
+
 Base image
 ----------
 
