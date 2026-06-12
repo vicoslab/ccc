@@ -1,0 +1,146 @@
+name: Docker Dev Image CI
+
+# Manual-only workflow for building one requested development image from a
+# single ROOT_IMAGE/TAG pair. This intentionally does not run on pushes or tags.
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "CCC image to build"
+        required: true
+        default: "base"
+        type: choice
+        options:
+          - base
+          - jupyter
+          - x2go
+          - xpra
+          - vscode
+      root_image:
+        description: "ROOT_IMAGE build arg. For base use Ubuntu/CUDA; for others use a parent CCC base image."
+        required: true
+        default: "nvidia/cuda:13.0.2-devel-ubuntu22.04"
+      tag:
+        description: "CCC image TAG suffix, e.g. ubuntu22.04-cuda13.0.2"
+        required: true
+        default: "ubuntu22.04-cuda13.0.2"
+      dev_prefix:
+        description: "Development tag prefix inserted before TAG"
+        required: true
+        default: "dev"
+      image_repository:
+        description: "Docker image repository to push to"
+        required: true
+        default: "vicoslab/ccc"
+
+run-name: Build dev ${{ inputs.image }} CCC image for ${{ inputs.tag }}
+
+jobs:
+  build-dev-image:
+    name: Build dev ${{ inputs.image }} image (${{ inputs.tag }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push requested CCC dev image
+        shell: bash
+        env:
+          # Keep the historical non-BuildKit build path used by this repo's
+          # production workflow comments.
+          DOCKER_BUILDKIT: "0"
+          IMAGE: ${{ inputs.image }}
+          ROOT_IMAGE: ${{ inputs.root_image }}
+          TAG: ${{ inputs.tag }}
+          DEV_PREFIX: ${{ inputs.dev_prefix }}
+          IMAGE_REPOSITORY: ${{ inputs.image_repository }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ROOT_IMAGE}" ]]; then
+            echo "root_image must not be empty" >&2
+            exit 1
+          fi
+
+          if [[ ! "${TAG}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "tag must contain only letters, numbers, '.', '_' or '-'" >&2
+            exit 1
+          fi
+
+          if [[ ! "${DEV_PREFIX}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "dev_prefix must contain only letters, numbers, '.', '_' or '-'" >&2
+            exit 1
+          fi
+
+          if [[ -z "${IMAGE_REPOSITORY}" || "${IMAGE_REPOSITORY}" =~ [[:space:]] ]]; then
+            echo "image_repository must not be empty or contain whitespace" >&2
+            exit 1
+          fi
+
+          case "${IMAGE}" in
+            base|jupyter|x2go|xpra|vscode)
+              ;;
+            *)
+              echo "Unsupported image '${IMAGE}'. Expected one of: base, jupyter, x2go, xpra, vscode." >&2
+              exit 1
+              ;;
+          esac
+
+          CONTEXT="${IMAGE}"
+          EXTRA_BUILD_ARGS=()
+
+          case "${IMAGE}" in
+            base)
+              ;;
+            jupyter)
+              if [[ "${TAG}" != *ubuntu22.04* ]]; then
+                echo "jupyter dev images are only enabled for ubuntu22.04 tags." >&2
+                exit 1
+              fi
+              ;;
+            x2go)
+              CONTEXT="x11"
+              EXTRA_BUILD_ARGS+=(--build-arg "X11_SERVER=x2go")
+              ;;
+            xpra)
+              if [[ "${TAG}" != *ubuntu22.04* && "${TAG}" != *ubuntu24.04* ]]; then
+                echo "xpra dev images are only enabled for ubuntu22.04/ubuntu24.04 tags." >&2
+                exit 1
+              fi
+              CONTEXT="x11"
+              EXTRA_BUILD_ARGS+=(--build-arg "X11_SERVER=xpra")
+              ;;
+            vscode)
+              ;;
+          esac
+
+          IMAGE_REF="${IMAGE_REPOSITORY}:${IMAGE}-${DEV_PREFIX}-${TAG}"
+
+          {
+            echo "## CCC dev image"
+            echo
+            echo "Requested image: \`${IMAGE}\`"
+            echo "Input ROOT_IMAGE: \`${ROOT_IMAGE}\`"
+            echo "Input TAG: \`${TAG}\`"
+            echo "Output image: \`${IMAGE_REF}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "::group::Build ${IMAGE_REF}"
+          docker build --pull -t "${IMAGE_REF}" \
+            --build-arg "ROOT_IMAGE=${ROOT_IMAGE}" \
+            "${EXTRA_BUILD_ARGS[@]}" \
+            "${CONTEXT}"
+          echo "::endgroup::"
+
+          echo "::group::Push ${IMAGE_REF}"
+          docker push "${IMAGE_REF}"
+          echo "::endgroup::"
