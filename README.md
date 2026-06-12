@@ -56,6 +56,35 @@ image itself:
 
 You do not need `--privileged` or app-side `--cap-add SYS_ADMIN`.
 
+Agent containment runtime
+-------------------------
+
+CCC agent filesystem containment now lives in the separate
+`ccc-agent-containment` repository. The CCC image does not include or enable it
+by default. At runit startup, the base image only installs the external runtime
+when explicitly requested:
+
+```bash
+-e CCC_AGENT_CONTAINMENT_ENABLE=1
+```
+
+Useful optional variables:
+
+```bash
+CCC_AGENT_CONTAINMENT_REPO=https://github.com/vicoslab/ccc-agent-containment.git
+CCC_AGENT_CONTAINMENT_REF=main
+CCC_AGENT_CONTAINMENT_INSTALL_DIR=/opt/ccc-agent
+CCC_AGENT_CONTAINMENT_ENABLE_SHIMS=0   # set 1 to install codex/claude/hermes/opencode shims
+CCC_AGENT_CONTAINMENT_BRANCHFS_BIN=/path/to/branchfs
+CCC_AGENT_CONFIG=/etc/ccc-agent/config.json
+```
+
+When enabled, startup clones the external runtime, installs only the runtime
+files under `/opt/ccc-agent`, links `ccc-agent-run`, `ccc-agent-launch`, and
+`ccc-agentctl` into `/usr/local/bin`, and generates a root-owned default config
+if `/etc/ccc-agent/config.json` is missing. Commit/review policy remains in the
+external runtime; CCC image startup only performs opt-in installation/wiring.
+
 VS Code
 -------
 
