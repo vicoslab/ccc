@@ -34,4 +34,14 @@ for dir in ${helper_dirs}; do
 done
 IFS=${old_ifs}
 
+umount_shim="${CCC_FUSE_UMOUNT_SHIM_PATH:-/usr/local/bin/umount}"
+mkdir -p "$(dirname "${umount_shim}")"
+tmp_umount_shim="${umount_shim}.tmp.$$"
+{
+    printf '%s\n' '#!/bin/sh'
+    printf 'exec "%s" -u "$@"\n' "${shim}"
+} > "${tmp_umount_shim}"
+chmod 0755 "${tmp_umount_shim}"
+mv -f "${tmp_umount_shim}" "${umount_shim}"
+
 mkdir -p "${CCC_FUSE_SOCKET_DIR:-/run/ccc-fuse-sidecar}"
