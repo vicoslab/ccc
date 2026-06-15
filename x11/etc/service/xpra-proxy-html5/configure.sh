@@ -2,9 +2,14 @@
 
 USER_NAME=${USER_NAME:-user}
 USER_HOME=${BASE%"/"}/$USER_NAME
+USER_ID=$(id -u "$USER_NAME")
 
 # need to set HOME to user 
 export HOME=$USER_HOME
+export XDG_RUNTIME_DIR="/run/user/${USER_ID}"
+
+# Xpra expects private per-user runtime/socket directories (0700).
+umask 077
 
 LOG_DIR=$USER_HOME/.xpra
 
