@@ -35,11 +35,11 @@ FROM xfce4-base as xfce4-xpra
 
 RUN apt-get clean && \
     apt-get -o Acquire::Retries=3 update --fix-missing && \
-    apt-get install -y --no-install-recommends software-properties-common apt-transport-https && \
-    wget -q https://xpra.org/gpg.asc -O- | apt-key add - && \
-    add-apt-repository "deb https://xpra.org/lts `lsb_release -cs` main" && apt-get -o Acquire::Retries=3 update && \
+    apt-get install -y --no-install-recommends software-properties-common apt-transport-https wget lsb-release && \
+    wget -q https://xpra.org/gpg.asc -O /usr/share/keyrings/xpra.asc && \
+    echo "deb [signed-by=/usr/share/keyrings/xpra.asc] https://xpra.org/lts $(lsb_release -cs) main" > /etc/apt/sources.list.d/xpra.list && \
+    apt-get -o Acquire::Retries=3 update && \
     apt-get install -y --no-install-recommends xpra dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
-
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 

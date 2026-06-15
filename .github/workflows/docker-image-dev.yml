@@ -112,8 +112,8 @@ jobs:
               EXTRA_BUILD_ARGS+=(--build-arg "X11_SERVER=x2go")
               ;;
             xpra)
-              if [[ "${TAG}" != *ubuntu22.04* && "${TAG}" != *ubuntu24.04* ]]; then
-                echo "xpra dev images are only enabled for ubuntu22.04/ubuntu24.04 tags." >&2
+              if [[ "${TAG}" != *ubuntu22.04* && "${TAG}" != *ubuntu24.04* && "${TAG}" != *ubuntu26.04* ]]; then
+                echo "xpra dev images are only enabled for ubuntu22.04/ubuntu24.04/ubuntu26.04 tags." >&2
                 exit 1
               fi
               CONTEXT="x11"
