@@ -7,7 +7,7 @@ FROM ${ROOT_IMAGE} as xfce4-base
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get clean && \
-    apt-get update --fix-missing && \
+    apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y --no-install-recommends xfce4 mate-terminal krusader && \
     apt-get install -y --no-install-recommends xubuntu-artwork xubuntu-icon-theme  breeze-icon-theme && \
     apt-get install -y --no-install-recommends ristretto gvfs gvfs-backends thunar-archive-plugin kio-extras ktexteditor-katepart && \
@@ -20,9 +20,9 @@ FROM xfce4-base as xfce4-x2go
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get clean && \
-    apt-get update --fix-missing && \
+    apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y --no-install-recommends software-properties-common && \
-    add-apt-repository -y ppa:x2go/stable && apt-get update && \
+    add-apt-repository -y ppa:x2go/stable && apt-get -o Acquire::Retries=3 update && \
     apt-get install -y --no-install-recommends x2goserver x2goserver-xsession pwgen dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
@@ -34,10 +34,10 @@ RUN mkdir -p /etc/service/xpra-proxy-html5 && touch /etc/service/xpra-proxy-html
 FROM xfce4-base as xfce4-xpra
 
 RUN apt-get clean && \
-    apt-get update --fix-missing && \
+    apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y --no-install-recommends software-properties-common apt-transport-https && \
     wget -q https://xpra.org/gpg.asc -O- | apt-key add - && \
-    add-apt-repository "deb https://xpra.org/lts `lsb_release -cs` main" && apt-get update && \
+    add-apt-repository "deb https://xpra.org/lts `lsb_release -cs` main" && apt-get -o Acquire::Retries=3 update && \
     apt-get install -y --no-install-recommends xpra=5.1.4-r0-1 dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
