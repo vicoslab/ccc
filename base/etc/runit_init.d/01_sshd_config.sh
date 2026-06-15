@@ -17,6 +17,9 @@ IgnoreRhosts yes
 PasswordAuthentication no
 PermitEmptyPasswords no
 
+# Use PAM so SSH command/PTY sessions receive /etc/environment via pam_env.
+UsePAM yes
+
 # Change to no to disable s/key passwords
 ChallengeResponseAuthentication no
 
