@@ -59,7 +59,7 @@ RUN apt-get clean && \
     if ! curl -sfL -o /dev/null "$XPRA_REPO/dists/$XPRA_CODENAME/InRelease"; then XPRA_REPO="https://xpra.org"; fi && \
     echo "deb [signed-by=/usr/share/keyrings/xpra.asc] $XPRA_REPO $XPRA_CODENAME main" > /etc/apt/sources.list.d/xpra.list && \
     apt-get -o Acquire::Retries=3 update && \
-    apt-get install -y --no-install-recommends xpra dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
+    apt-get install -y --no-install-recommends xpra xpra-x11 dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 
