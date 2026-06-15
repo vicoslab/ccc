@@ -70,7 +70,16 @@ WORKDIR /tmp/xpra-html5
 # available"). v21 uses rencodeplus and connects to the xpra 5.x and 6.x servers used
 # across 22.04/24.04/26.04. Note: the installer's first positional argument is the
 # install ROOT (it appends /usr/share/xpra/www), so pass "/".
-RUN git clone --depth 1 --branch v21 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install / && rm -rf /tmp/xpra-html5/*
+RUN git clone --depth 1 --branch v21 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install / && \
+    # Reverse-proxy fix: the connect page's server probe and its info-endpoint XHRs
+    # (/Info, /Sessions, /Displays, /DesktopMenu, favicon.png?echo-headers) embed the xpra
+    # username in the request URL ("https://user@host/..."). That userinfo overrides /
+    # suppresses the browser's cached HTTP Basic Auth from a front proxy (e.g. FRP), so the
+    # requests 401 and the client cannot detect the server or populate sessions. xpra's own
+    # HTTP endpoints do not use HTTP Basic Auth (auth is in the xpra protocol), so drop the
+    # userinfo via the existing get_host_address(true) and let the proxy credentials flow.
+    sed -i 's/get_host_address() + uri/get_host_address(true) + uri/g; s/const url = get_host_address();/const url = get_host_address(true);/g' /usr/share/xpra/www/connect.html && \
+    rm -rf /tmp/xpra-html5/*
 
 ENV XPRA_PROXY_HTML5_PORT 8888
 
