@@ -6,10 +6,10 @@
 echo '######################################################################################################' #| tee $LOG_DIR/xpra-proxy.log
 echo '######################################### STARTED XRPA Proxy #########################################' #| tee $LOG_DIR/xpra-proxy.log
 exec chpst -u $USER_NAME xpra proxy :1000 \
-						--tcp-auth=allow \
+						--tcp-auth=none \
 						--bind-tcp=0.0.0.0:${XPRA_PROXY_HTML5_PORT} \
 						--html=/usr/share/xpra/www \
 						--clipboard=GDK --clipboard-direction=both \
-						--bell=off --daemon=no >> $LOG_DIR/$HOSTNAME-xpra-proxy.log 2>&1 
+						--bell=off --daemon=no >> "$PROXY_LOG" 2>&1
 
 
