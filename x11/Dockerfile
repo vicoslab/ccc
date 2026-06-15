@@ -19,10 +19,21 @@ FROM xfce4-base as xfce4-x2go
 
 ENV DEBIAN_FRONTEND noninteractive
 
+# The x2go/stable PPA does not publish packages for every Ubuntu release (e.g. it has
+# no 26.04/resolute build). Use the PPA when it is available for this release, otherwise
+# fall back to the x2goserver packages shipped in the Ubuntu archive (universe), which are
+# present on 22.04, 24.04 and 26.04. This keeps the image building across all releases.
 RUN apt-get clean && \
     apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y --no-install-recommends software-properties-common && \
-    add-apt-repository -y ppa:x2go/stable && apt-get -o Acquire::Retries=3 update && \
+    if add-apt-repository -y ppa:x2go/stable && apt-get -o Acquire::Retries=3 update; then \
+        echo "x2go: using ppa:x2go/stable"; \
+    else \
+        echo "x2go: PPA not available for this release, falling back to Ubuntu archive"; \
+        add-apt-repository -r -y ppa:x2go/stable || true; \
+        rm -f /etc/apt/sources.list.d/*x2go* || true; \
+        apt-get -o Acquire::Retries=3 update; \
+    fi && \
     apt-get install -y --no-install-recommends x2goserver x2goserver-xsession pwgen dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
@@ -33,13 +44,22 @@ RUN mkdir -p /etc/service/xpra-proxy-html5 && touch /etc/service/xpra-proxy-html
 #### XFCE4 with Xpra ####
 FROM xfce4-base as xfce4-xpra
 
+# Install the xpra.org repository key into a keyring file referenced via signed-by.
+# `apt-key` is deprecated and has been removed entirely on newer releases (e.g. 26.04),
+# so it can no longer be used. The xpra.org "lts" channel only ships some codenames
+# (e.g. jammy, noble); for releases it does not cover (e.g. resolute/26.04) fall back to
+# the regular xpra.org channel, which tracks all current Ubuntu codenames.
 RUN apt-get clean && \
     apt-get -o Acquire::Retries=3 update --fix-missing && \
-    apt-get install -y --no-install-recommends software-properties-common apt-transport-https && \
-    wget -q https://xpra.org/gpg.asc -O- | apt-key add - && \
-    add-apt-repository "deb https://xpra.org/lts `lsb_release -cs` main" && apt-get -o Acquire::Retries=3 update && \
+    apt-get install -y --no-install-recommends software-properties-common apt-transport-https ca-certificates curl wget && \
+    install -d -m 0755 /usr/share/keyrings && \
+    wget -q https://xpra.org/gpg.asc -O /usr/share/keyrings/xpra.asc && \
+    XPRA_CODENAME="$(. /etc/os-release && echo $VERSION_CODENAME)" && \
+    XPRA_REPO="https://xpra.org/lts" && \
+    if ! curl -sfL -o /dev/null "$XPRA_REPO/dists/$XPRA_CODENAME/InRelease"; then XPRA_REPO="https://xpra.org"; fi && \
+    echo "deb [signed-by=/usr/share/keyrings/xpra.asc] $XPRA_REPO $XPRA_CODENAME main" > /etc/apt/sources.list.d/xpra.list && \
+    apt-get -o Acquire::Retries=3 update && \
     apt-get install -y --no-install-recommends xpra dbus-x11 xdg-utils libdbus-glib-1-2 libdbusmenu-glib4 libdbusmenu-gtk3-4 python3-xdg python3-pyinotify xserver-xorg-input-libinput websockify uglifyjs && \
-
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 

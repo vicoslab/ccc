@@ -18,9 +18,9 @@ Example base image run:
 The workflow pushes one development tag to Docker Hub using the configured `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets:
 
  * `vicoslab/ccc:base-dev-<tag>`
- * `vicoslab/ccc:jupyter-dev-<tag>` for Ubuntu 22.04 tags, when `image` is `jupyter`
+ * `vicoslab/ccc:jupyter-dev-<tag>` for Ubuntu 22.04/24.04/26.04 tags, when `image` is `jupyter`
  * `vicoslab/ccc:x2go-dev-<tag>` when `image` is `x2go`
- * `vicoslab/ccc:xpra-dev-<tag>` for Ubuntu 22.04/24.04 tags, when `image` is `xpra`
+ * `vicoslab/ccc:xpra-dev-<tag>` for Ubuntu 22.04/24.04/26.04 tags, when `image` is `xpra`
  * `vicoslab/ccc:vscode-dev-<tag>` when `image` is `vscode`
 
 For non-base images, `root_image` should be the parent CCC base image to extend, such as `vicoslab/ccc:base-dev-ubuntu22.04-cuda13.0.2`. The workflow is intentionally configured only with `workflow_dispatch`, so it does not run on pushes, pull requests, or tags.
