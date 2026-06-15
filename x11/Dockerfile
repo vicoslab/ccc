@@ -64,7 +64,13 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/xpra-html5
-RUN git clone --branch v4.5.1 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install /usr/share/xpra/www && rm -rf /tmp/xpra-html5/*
+# xpra-html5 v4.5.1 only speaks the legacy `bencode` packet encoding, which xpra 6.x
+# servers (e.g. the 6.x packages on 26.04) no longer support, so the HTML5 browser
+# client could not connect ("invalid packet encoding: 'bencode' decoder is not
+# available"). v21 uses rencodeplus and connects to the xpra 5.x and 6.x servers used
+# across 22.04/24.04/26.04. Note: the installer's first positional argument is the
+# install ROOT (it appends /usr/share/xpra/www), so pass "/".
+RUN git clone --depth 1 --branch v21 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install / && rm -rf /tmp/xpra-html5/*
 
 ENV XPRA_PROXY_HTML5_PORT 8888
 
