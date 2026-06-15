@@ -12,7 +12,7 @@ ENV BASE=/home
 env LOCAL_SSD_STORAGE /storage/local/ssd
 ENV CCC_FUSE_SIDECAR_SOCKET=/run/ccc-fuse-sidecar/fuse.sock
 
-RUN apt-get update --fix-missing && \
+RUN apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y build-essential wget bzip2 ca-certificates \
 			libglib2.0-0 libxext6 libsm6 libxrender1 libgl1-mesa-glx libglu1-mesa libxt6 libxtst6 libxi6 \
 			nano htop tmux curl git cmake \

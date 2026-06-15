@@ -3,7 +3,7 @@ FROM ${ROOT_IMAGE}
 LABEL maintainer "Luka Cehovin Zajc <luka.cehovin@fri.uni-lj.si>"
 
 RUN apt-get clean && \
-    apt-get update --fix-missing && \
+    apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y python3-pip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
