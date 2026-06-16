@@ -31,7 +31,6 @@ RUN apt-get clean && \
 RUN mkdir -p /etc/service/xpra-proxy-html5 && touch /etc/service/xpra-proxy-html5/down
 
 #### XFCE4 with Xpra ####
-ARG XPRA_HTML5_VER="v13"
 FROM xfce4-base as xfce4-xpra
 
 RUN apt-get clean && \
@@ -43,9 +42,10 @@ RUN apt-get clean && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 
+ARG XPRA_HTML5_VER="v13"
 RUN set -eux; \
     xpra_html_tmp="$(mktemp -d)"; \
-    git clone --depth 1 --branch "${XPRA_HTML5_VER}" https://github.com/Xpra-org/xpra-html5 "${xpra_html_tmp}"; \
+    git clone --depth 1 --branch ${XPRA_HTML5_VER} https://github.com/Xpra-org/xpra-html5 "${xpra_html_tmp}"; \
     rm -rf /usr/share/xpra/www; \
     python3 "${xpra_html_tmp}/setup.py" install /; \
     rm -rf "${xpra_html_tmp}"
