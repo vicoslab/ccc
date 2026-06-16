@@ -1,4 +1,6 @@
 Changes for v1.13:
+ - bugfixes:
+	- fixed USER_GROUPS not honoring the requested GID when it was already in use (e.g. docker=998 colliding with the runit-log groups)
  - minor update:
 	- added CCC FUSE sidecar client shim integration for FUSE-enabled containers
 	- added startup relink hook for fusermount3/fusermount/fusemount helper names after package installs

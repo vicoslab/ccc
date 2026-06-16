@@ -21,11 +21,25 @@ if [ ! -z "${USER_GROUPS}" ]; then
         GROUP_ID=${GRPUP_NAME_ID[1]}
         
         if [ ! -z "${GROUP_ID}" ]; then
-            groupadd  -f -g $GROUP_ID $GROUP_NAME
+            # Honor the exact requested GID. We intentionally avoid `groupadd -f -g`
+            # here: when the requested GID is already used by another group (e.g.
+            # GID 998/999 are taken by the runit-log groups), `-f` silently turns
+            # off `-g` and picks a different free GID, so the group ends up with
+            # the wrong ID and the user loses access to the matching resource
+            # (e.g. the host docker socket).
+            if getent group "$GROUP_NAME" > /dev/null; then
+                # group name already exists: force it to use the requested GID
+                # (-o allows the GID to be shared with an existing group)
+                groupmod -o -g "$GROUP_ID" "$GROUP_NAME"
+            else
+                # create the group with the exact GID; -o allows a non-unique GID
+                # so a pre-existing group on the same GID does not block us
+                groupadd -o -g "$GROUP_ID" "$GROUP_NAME"
+            fi
         else
-            groupadd  -f $GROUP_NAME
+            groupadd -f "$GROUP_NAME"
         fi
-        usermod -a -G $GROUP_NAME $USER_NAME
+        usermod -a -G "$GROUP_NAME" "$USER_NAME"
     done
 fi
 
