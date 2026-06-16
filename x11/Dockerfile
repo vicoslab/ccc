@@ -44,8 +44,8 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/xpra-html5
-RUN rm -rf /usr/share/xpra/www && \
-    git clone --depth 1 --branch $XPRA_HTML5_VER https://github.com/Xpra-org/xpra-html5 . && \
+RUN git clone --depth 1 --branch ${XPRA_HTML5_VER} https://github.com/Xpra-org/xpra-html5 . && \
+    rm -rf /usr/share/xpra/www && \
     ./setup.py install /
 
 ENV XPRA_PROXY_HTML5_PORT 8888
