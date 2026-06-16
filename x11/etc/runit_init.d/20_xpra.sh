@@ -34,6 +34,13 @@ cat > /usr/share/xpra/www/default-settings.txt << EOF
 username = $USER_NAME
 password = $USER_NAME
 ssl = true
+# Auto-connect to the desktop session pre-started by the xpra-desktop service (display :100)
+# instead of going through the proxy's "start a new session" flow. That start-and-reconnect
+# flow hangs for the HTML5 client behind a reverse proxy ("Sending handshake" -> "No password
+# specified" / 1006); attaching to an already-running session connects cleanly.
+action = connect
+display = :100
+submit = true
 EOF
 
 

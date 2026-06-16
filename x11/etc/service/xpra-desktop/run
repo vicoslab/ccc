@@ -1,0 +1,19 @@
+#!/bin/sh -e
+
+# include configuration file that should do all checks and setup variables
+. ./configure.sh
+
+echo '######################################################################################################'
+echo '######################################### STARTED XPRA Desktop #######################################'
+
+# Pre-start a persistent xpra desktop session (display :100) that the HTML5 client auto-attaches
+# to (see default-settings.txt action=connect display=:100). This avoids the proxy's
+# "start a new session" path, which hangs for the HTML5 client behind a reverse proxy.
+# --exit-with-children=no keeps the session alive even if the desktop is closed, so runit can
+# keep it running and clients can reconnect.
+exec chpst -u $USER_NAME xpra start-desktop :100 \
+						--start-child=xfce4-session \
+						--exit-with-children=no \
+						--no-pulseaudio \
+						--bell=off \
+						--daemon=no >> $LOG_DIR/$HOSTNAME-xpra-desktop.log 2>&1
