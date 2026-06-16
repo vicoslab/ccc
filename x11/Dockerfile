@@ -31,6 +31,7 @@ RUN apt-get clean && \
 RUN mkdir -p /etc/service/xpra-proxy-html5 && touch /etc/service/xpra-proxy-html5/down
 
 #### XFCE4 with Xpra ####
+ARG XPRA_HTML5_VER="v13"
 FROM xfce4-base as xfce4-xpra
 
 RUN apt-get clean && \
@@ -43,7 +44,9 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/xpra-html5
-RUN git clone --depth 1 --branch v13 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install / 
+RUN rm -rf /usr/share/xpra/www && \
+    git clone --depth 1 --branch $XPRA_HTML5_VER https://github.com/Xpra-org/xpra-html5 . && \
+    ./setup.py install /
 
 ENV XPRA_PROXY_HTML5_PORT 8888
 
