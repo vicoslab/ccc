@@ -32,10 +32,11 @@ cat > /usr/share/xpra/www/default-settings.txt << EOF
 # bandwidth_limit = 10000000
 # debug_keyboard = true
 username = $USER_NAME
-# No "password" entry: the proxy runs with tcp-auth=none (see the xpra-proxy-html5 service),
-# so the HTML5 client must NOT expect an authentication challenge. Setting a password here
-# makes the client wait for a challenge the proxy never sends. Access control is handled by
-# the front proxy (FRP) and the network.
+# The proxy runs with tcp-auth=allow (see the xpra-proxy-html5 service): it issues a password
+# challenge that accepts any answer, so the HTML5 client must supply a password. The server
+# challenges with a safe hmac digest (the Dockerfile patches choose_digest so it never falls
+# back to the insecure "xor" digest that modern v14+ clients refuse over a reverse proxy).
+password = $USER_NAME
 ssl = true
 EOF
 

@@ -16,16 +16,17 @@ echo '######################################### STARTED XRPA Proxy #############
 # reverse proxy. (This regressed in xpra 5.x; 4.4.x relayed differently.)
 export XPRA_PROXY_INSTANCE_THREADED=1
 
-# Use tcp-auth=none (no challenge) rather than tcp-auth=allow. "allow" still issues a
-# password challenge but accepts any answer, so it provides no real authentication - yet
-# the HTML5 browser client must answer it, and the modern (v6+) client mishandles that
-# challenge behind a TLS-terminating reverse proxy, failing with "No password specified
-# for authentication challenge". Access control is provided by the front proxy (FRP) and
-# the network, not by this challenge, so dropping it loses no real security and lets the
-# browser client connect cleanly. The container is single-user, so the proxy still routes
-# to / starts the user's session without an authenticated username.
+# tcp-auth=allow issues a password challenge and accepts any answer (the container is
+# single-user; real access control is the front proxy/FRP + the network). For this to work
+# with a modern HTML5 client (v14+), the server must NOT challenge with the insecure "xor"
+# digest: since v14 the client refuses xor over a connection it considers unencrypted (and
+# behind a TLS-terminating reverse proxy it cannot tell the hop is encrypted), dropping the
+# WebSocket. xpra's choose_digest() falls back to xor whenever the client offers none of
+# hmac+sha512/384/256/224 - skipping the hmac/hmac+md5 every client also offers - so the
+# Dockerfile patches choose_digest to prefer those safe hmac digests before xor. The server
+# then challenges with hmac (never xor) and the modern client accepts it.
 exec chpst -u $USER_NAME xpra proxy :1000 \
-						--tcp-auth=none \
+						--tcp-auth=allow \
 						--bind-tcp=0.0.0.0:${XPRA_PROXY_HTML5_PORT} \
 						--html=/usr/share/xpra/www \
 						--clipboard=GDK --clipboard-direction=both \

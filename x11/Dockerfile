@@ -63,6 +63,29 @@ RUN apt-get clean && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 
+# Never let the server challenge with the insecure "xor" password digest. With tcp-auth=allow
+# the server picks the challenge digest via xpra.net.digest.choose_digest(), which prefers
+# hmac+sha512/384/256/224 but then falls straight back to "xor" - skipping the plain "hmac"
+# and "hmac+md5" that every client also advertises. So when a client doesn't offer the strong
+# sha hashes (e.g. its bundled 'forge' crypto lib didn't load), the server requests xor, and
+# any modern HTML5 client (v14+) refuses xor over a connection it deems unencrypted (which it
+# always does behind a TLS-terminating reverse proxy) and drops the WebSocket. Teach
+# choose_digest to prefer the safe hmac variants before xor, so a non-xor digest is always
+# chosen when the client offers any hmac at all (it always does).
+RUN python3 - <<'PYEOF'
+import xpra.net.digest as d
+f = d.__file__
+s = open(f).read()
+old_tuple = '("sha512", "sha384", "sha256", "sha224")'
+assert old_tuple in s, "choose_digest hash tuple not found - xpra layout changed"
+s = s.replace(old_tuple, '("sha512", "sha384", "sha256", "sha224", "sha1", "md5")')
+old_xor = '    if "xor" in options:\n        return "xor"'
+assert old_xor in s, "choose_digest xor fallback not found - xpra layout changed"
+s = s.replace(old_xor, '    if "hmac" in options:\n        return "hmac"\n' + old_xor, 1)
+open(f, "w").write(s)
+print("patched choose_digest in", f)
+PYEOF
+
 WORKDIR /tmp/xpra-html5
 # Pick the bundled HTML5 client to match the installed xpra server:
 #   * xpra 5.x (the LTS channel used on 22.04/24.04): use the well-tested v4.5.1 client.
