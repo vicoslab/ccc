@@ -5,11 +5,19 @@
 
 echo '######################################################################################################' #| tee $LOG_DIR/xpra-proxy.log
 echo '######################################### STARTED XRPA Proxy #########################################' #| tee $LOG_DIR/xpra-proxy.log
+# Use tcp-auth=none (no challenge) rather than tcp-auth=allow. "allow" still issues a
+# password challenge but accepts any answer, so it provides no real authentication - yet
+# the HTML5 browser client must answer it, and the modern (v6+) client mishandles that
+# challenge behind a TLS-terminating reverse proxy, failing with "No password specified
+# for authentication challenge". Access control is provided by the front proxy (FRP) and
+# the network, not by this challenge, so dropping it loses no real security and lets the
+# browser client connect cleanly. The container is single-user, so the proxy still routes
+# to / starts the user's session without an authenticated username.
 exec chpst -u $USER_NAME xpra proxy :1000 \
-						--tcp-auth=allow \
+						--tcp-auth=none \
 						--bind-tcp=0.0.0.0:${XPRA_PROXY_HTML5_PORT} \
 						--html=/usr/share/xpra/www \
 						--clipboard=GDK --clipboard-direction=both \
-						--bell=off --daemon=no >> $LOG_DIR/$HOSTNAME-xpra-proxy.log 2>&1 
+						--bell=off --daemon=no >> $LOG_DIR/$HOSTNAME-xpra-proxy.log 2>&1
 
 
