@@ -32,9 +32,25 @@ cat > /usr/share/xpra/www/default-settings.txt << EOF
 # bandwidth_limit = 10000000
 # debug_keyboard = true
 username = $USER_NAME
+# The proxy runs with tcp-auth=allow (see the xpra-proxy-html5 service): it issues a password
+# challenge that accepts any answer, so the HTML5 client must supply a password. The server
+# challenges with a safe hmac digest (the Dockerfile patches choose_digest so it never falls
+# back to the insecure "xor" digest that modern v14+ clients refuse over a reverse proxy).
 password = $USER_NAME
 ssl = true
 EOF
+
+
+# Land the bare URL on the connection form (connect.html) instead of index.html.
+# index.html is the auto-connecting client: opened with no parameters it immediately
+# starts an empty seamless session (blank screen). connect.html is the form that lets
+# the user pick "Start Command" / "Start Desktop" / connect to an existing display, and
+# it submits back to index.html with submit=true. So we redirect any parameter-less
+# (submit!=true) load of index.html to the form, while real connections pass through.
+XPRA_INDEX=/usr/share/xpra/www/index.html
+if [ -f "$XPRA_INDEX" ] && ! grep -q "ccc-landing-redirect" "$XPRA_INDEX"; then
+	sed -i '0,/<head>/s##<head>\n<script id="ccc-landing-redirect">if(new URLSearchParams(location.search).get("submit")!=="true"){location.replace("connect.html");}</script>#' "$XPRA_INDEX"
+fi
 
 
 echo "XPRA configuration completed."
