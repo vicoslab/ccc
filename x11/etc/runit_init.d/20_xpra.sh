@@ -45,6 +45,7 @@ cat > /usr/share/xpra/www/default-settings.txt << EOF
 # bandwidth_limit = 10000000
 # debug_keyboard = true
 username = $USER_NAME
+password = $USER_NAME
 ssl = true
 webtransport = false
 exit_with_client = false

@@ -42,6 +42,9 @@ RUN apt-get clean && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
 
+WORKDIR /tmp/xpra-html5
+RUN git clone --depth 1 --branch v13 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install /usr/share/xpra/www
+
 ENV XPRA_PROXY_HTML5_PORT 8888
 
 EXPOSE $XPRA_PROXY_HTML5_PORT
