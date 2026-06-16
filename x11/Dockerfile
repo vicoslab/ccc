@@ -64,21 +64,30 @@ RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp/xpra-html5
-# xpra-html5 v4.5.1 only speaks the legacy `bencode` packet encoding, which xpra 6.x
-# servers (e.g. the 6.x packages on 26.04) no longer support, so the HTML5 browser
-# client could not connect ("invalid packet encoding: 'bencode' decoder is not
-# available"). v21 uses rencodeplus and connects to the xpra 5.x and 6.x servers used
-# across 22.04/24.04/26.04. Note: the installer's first positional argument is the
-# install ROOT (it appends /usr/share/xpra/www), so pass "/".
-RUN git clone --depth 1 --branch v21 https://github.com/Xpra-org/xpra-html5 . && ./setup.py install / && \
-    # Reverse-proxy fix: the connect page's server probe and its info-endpoint XHRs
-    # (/Info, /Sessions, /Displays, /DesktopMenu, favicon.png?echo-headers) embed the xpra
-    # username in the request URL ("https://user@host/..."). That userinfo overrides /
-    # suppresses the browser's cached HTTP Basic Auth from a front proxy (e.g. FRP), so the
-    # requests 401 and the client cannot detect the server or populate sessions. xpra's own
-    # HTTP endpoints do not use HTTP Basic Auth (auth is in the xpra protocol), so drop the
-    # userinfo via the existing get_host_address(true) and let the proxy credentials flow.
-    sed -i 's/get_host_address() + uri/get_host_address(true) + uri/g; s/const url = get_host_address();/const url = get_host_address(true);/g' /usr/share/xpra/www/connect.html && \
+# Pick the bundled HTML5 client to match the installed xpra server:
+#   * xpra 5.x (the LTS channel used on 22.04/24.04): use the well-tested v4.5.1 client.
+#     It works through reverse proxies that enforce HTTP Basic Auth (e.g. FRP); the newer
+#     v6+ client regressed that (it embeds the username in info-endpoint URLs which
+#     suppresses the proxy's Basic Auth, gates the password behind an SSL *checkbox* it
+#     cannot infer from a TLS-terminating proxy, and adds connect-page features that 401).
+#   * xpra 6.x (the current channel on 26.04): v4.5.1 cannot connect (it only speaks the
+#     legacy `bencode` packet encoding which 6.x dropped - "invalid packet encoding:
+#     'bencode' decoder is not available"), so use v21 and patch its connect page to work
+#     behind a TLS-terminating reverse proxy: treat an https-served page as a secure
+#     connection (so the password is sent), and stop injecting the xpra username into the
+#     info-endpoint/probe URLs (so the proxy's Basic Auth is not suppressed and they do not
+#     401). Note: v21's installer takes the install ROOT as its first argument (it appends
+#     /usr/share/xpra/www), whereas v4.5.1 takes the install dir directly.
+RUN set -eux; \
+    XPRA_MAJOR="$(xpra --version 2>/dev/null | grep -oE '[0-9]+' | head -1)"; \
+    if [ "${XPRA_MAJOR:-5}" -ge 6 ]; then \
+        git clone --depth 1 --branch v21 https://github.com/Xpra-org/xpra-html5 . ; \
+        ./setup.py install / ; \
+        sed -i 's/get_host_address() + uri/get_host_address(true) + uri/g; s/const url = get_host_address();/const url = get_host_address(true);/g; s/return webtransport_input.checked/return location.protocol==="https:" || webtransport_input.checked/' /usr/share/xpra/www/connect.html ; \
+    else \
+        git clone --depth 1 --branch v4.5.1 https://github.com/Xpra-org/xpra-html5 . ; \
+        ./setup.py install /usr/share/xpra/www ; \
+    fi; \
     rm -rf /tmp/xpra-html5/*
 
 ENV XPRA_PROXY_HTML5_PORT 8888
