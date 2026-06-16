@@ -46,8 +46,8 @@ ARG XPRA_HTML5_VER="v13"
 RUN set -eux; \
     xpra_html_tmp="$(mktemp -d)"; \
     git clone --depth 1 --branch ${XPRA_HTML5_VER} https://github.com/Xpra-org/xpra-html5 "${xpra_html_tmp}"; \
-    rm -rf /usr/share/xpra/www; \
-    python3 "${xpra_html_tmp}/setup.py" install /; \
+    rm -rf /usr/share/xpra/www/*; \
+    cd ${xpra_html_tmp} && python3 setup.py install /; \
     rm -rf "${xpra_html_tmp}"
 
 ENV XPRA_PROXY_HTML5_PORT 8888
