@@ -5,6 +5,17 @@
 
 echo '######################################################################################################' #| tee $LOG_DIR/xpra-proxy.log
 echo '######################################### STARTED XRPA Proxy #########################################' #| tee $LOG_DIR/xpra-proxy.log
+# Force "threaded" (in-process) proxy instances instead of the default per-client child
+# process. When the HTML5 client asks the proxy to START a new session (action=start), xpra
+# 5.x hands the client socket over to a freshly-spawned child proxy process via fd-passing.
+# That handover only works for ssl/wss/ssh client sockets; for a plain "ws" socket - which
+# is what we get because FRP terminates TLS upstream and forwards plain HTTP - the handover
+# fails ("network IO threads have failed to terminate") and the browser hangs forever at
+# "Sending handshake" / "WebSocket connection established". Threaded instances relay the
+# connection in-process with no handover, so starting sessions on demand works behind the
+# reverse proxy. (This regressed in xpra 5.x; 4.4.x relayed differently.)
+export XPRA_PROXY_INSTANCE_THREADED=1
+
 # Use tcp-auth=none (no challenge) rather than tcp-auth=allow. "allow" still issues a
 # password challenge but accepts any answer, so it provides no real authentication - yet
 # the HTML5 browser client must answer it, and the modern (v6+) client mishandles that

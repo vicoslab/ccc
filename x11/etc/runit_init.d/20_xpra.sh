@@ -32,16 +32,24 @@ cat > /usr/share/xpra/www/default-settings.txt << EOF
 # bandwidth_limit = 10000000
 # debug_keyboard = true
 username = $USER_NAME
-password = $USER_NAME
+# No "password" entry: the proxy runs with tcp-auth=none (see the xpra-proxy-html5 service),
+# so the HTML5 client must NOT expect an authentication challenge. Setting a password here
+# makes the client wait for a challenge the proxy never sends. Access control is handled by
+# the front proxy (FRP) and the network.
 ssl = true
-# Auto-connect to the desktop session pre-started by the xpra-desktop service (display :100)
-# instead of going through the proxy's "start a new session" flow. That start-and-reconnect
-# flow hangs for the HTML5 client behind a reverse proxy ("Sending handshake" -> "No password
-# specified" / 1006); attaching to an already-running session connects cleanly.
-action = connect
-display = :100
-submit = true
 EOF
+
+
+# Land the bare URL on the connection form (connect.html) instead of index.html.
+# index.html is the auto-connecting client: opened with no parameters it immediately
+# starts an empty seamless session (blank screen). connect.html is the form that lets
+# the user pick "Start Command" / "Start Desktop" / connect to an existing display, and
+# it submits back to index.html with submit=true. So we redirect any parameter-less
+# (submit!=true) load of index.html to the form, while real connections pass through.
+XPRA_INDEX=/usr/share/xpra/www/index.html
+if [ -f "$XPRA_INDEX" ] && ! grep -q "ccc-landing-redirect" "$XPRA_INDEX"; then
+	sed -i '0,/<head>/s##<head>\n<script id="ccc-landing-redirect">if(new URLSearchParams(location.search).get("submit")!=="true"){location.replace("connect.html");}</script>#' "$XPRA_INDEX"
+fi
 
 
 echo "XPRA configuration completed."
