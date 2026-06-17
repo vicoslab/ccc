@@ -14,7 +14,7 @@ ENV CCC_FUSE_SIDECAR_SOCKET=/run/ccc-fuse-sidecar/fuse.sock
 
 RUN apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y build-essential wget bzip2 ca-certificates \
-			libglib2.0-0 libxext6 libsm6 libxrender1 libgl1-mesa-glx libglu1-mesa libxt6 libxtst6 libxi6 \
+			libglib2.0-0 libxext6 libsm6 libxrender1 libgl1 libglx-mesa0 libglu1-mesa libxt6 libxtst6 libxi6 \
 			nano htop tmux curl git cmake \
 			runit rsyslog cron  openssh-server && \
     mkdir -p /run/ccc-fuse-sidecar && \

@@ -1,6 +1,7 @@
 Changes for v1.13:
  - bugfixes:
 	- fixed USER_GROUPS not honoring the requested GID when it was already in use (e.g. docker=998 colliding with the runit-log groups)
+	- replaced obsolete libgl1-mesa-glx with libgl1 + libglx-mesa0 in base image so it builds on Ubuntu 24.04 (package was dropped in Noble)
  - minor update:
 	- added CCC FUSE sidecar client shim integration for FUSE-enabled containers
 	- added startup relink hook for fusermount3/fusermount/fusemount helper names after package installs
