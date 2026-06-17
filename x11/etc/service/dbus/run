@@ -6,4 +6,4 @@ mkdir -p /run/dbus /var/run/dbus
 # stale dbus state left behind by the previous boot before starting a new bus.
 rm -f /run/dbus/pid /var/run/dbus/pid /run/dbus/system_bus_socket /var/run/dbus/system_bus_socket 2> /dev/null
 
-exec /usr/bin/dbus-daemon --system --nofork --nopidfile 2>&1
+exec /usr/bin/dbus-daemon --system --nofork 2>&1
