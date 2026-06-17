@@ -8,7 +8,36 @@ USER_PUBKEY=${USER_PUBKEY}
 
 USER_HOME=${BASE%"/"}/$USER_NAME
 
+# Ubuntu 24.04 base images ship a default 'ubuntu' user (and group) at UID/GID
+# 1000. When the requested USER_ID/USER_NAME differs, that pre-existing entry
+# squats on the UID and `adduser --uid` fails; under `set -e` that aborts the
+# whole startup before the SSH key is installed, which breaks SSH logins (this
+# is never hit on 22.04, whose base image has no user at UID 1000). Remove the
+# conflicting default user/group first so we can claim the requested IDs.
+EXISTING_USER=$(getent passwd "$USER_ID" | cut -d: -f1)
+if [ -n "$EXISTING_USER" ] && [ "$EXISTING_USER" != "$USER_NAME" ]; then
+    echo "Removing default user '$EXISTING_USER' occupying UID $USER_ID"
+    deluser "$EXISTING_USER" > /dev/null 2>&1 || userdel "$EXISTING_USER" > /dev/null 2>&1 || true
+fi
+EXISTING_GROUP=$(getent group "$USER_ID" | cut -d: -f1)
+if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "$USER_NAME" ]; then
+    echo "Removing default group '$EXISTING_GROUP' occupying GID $USER_ID"
+    groupdel "$EXISTING_GROUP" > /dev/null 2>&1 || true
+fi
+
 getent passwd $USER_NAME || adduser --uid=$USER_ID --home=$USER_HOME --disabled-password --gecos "" $USER_NAME
+
+# OpenSSH 9.x (Ubuntu 24.04) refuses *all* authentication -- including publickey
+# -- for accounts whose password is "locked", i.e. a shadow field starting with
+# '!' as left by `adduser --disabled-password` (sshd logs "account is locked").
+# OpenSSH 8.x (22.04) only applied that to password auth, so key logins worked.
+# Swap the locked '!' for '*': still no usable password (password auth stays
+# disabled, and PasswordAuthentication is off anyway), but the account is no
+# longer considered locked, so key-based logins work on 22.04 and 24.04 alike.
+CURRENT_PW=$(getent shadow "$USER_NAME" | cut -d: -f2)
+case "$CURRENT_PW" in
+    '!'*) usermod -p '*' "$USER_NAME" ;;
+esac
 
 if [ ! -z "${USER_GROUPS}" ]; then
     # split groups into list using ',' as separator
