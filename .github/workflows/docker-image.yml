@@ -62,6 +62,8 @@ jobs:
             TAG: ubuntu24.04-cuda12.6.1
           - ROOT_IMAGE: nvidia/cuda:13.0.2-devel-ubuntu24.04
             TAG: ubuntu24.04-cuda13.0.2
+          - ROOT_IMAGE: nvidia/cuda:13.3.0-devel-ubuntu24.04
+            TAG: ubuntu24.04-cuda13.3.0
 
     continue-on-error: true
     steps:
@@ -89,7 +91,7 @@ jobs:
         always_pull: true
 
     - name: Build and push jupyter CCC image
-      if: contains(matrix.TAG, 'ubuntu22.04') # jupyter does not build for newer versions any more, so from v1.09 we build it only for ubuntu 22.04
+      if: contains(matrix.TAG, 'ubuntu22.04') || contains(matrix.TAG, 'ubuntu24.04') # jupyter now installs into a virtualenv (PEP 668 fix), so it builds on ubuntu 22.04 and 24.04
       uses: docker/build-push-action@v1.1.0
       #env:        
       #    DOCKER_BUILDKIT: 1
