@@ -21,7 +21,16 @@ RUN apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN sed -i '/imklog/s/^/#/' /etc/rsyslog.conf
+RUN set -eux; \
+    for f in /etc/rsyslog.conf /etc/rsyslog.d/*.conf; do \
+        [ -f "$f" ] || continue; \
+        sed -i \
+            -e '/imklog/s/^/#/' \
+            -e '/^[[:space:]]*\$KLogPermitNonKernelFacility\>/s/^/#/' \
+            -e '/^[[:space:]]*KLogPermitNonKernelFacility\>/s/^/#/' \
+            -e '/\/dev\/xconsole/s/^/#/' \
+            "$f"; \
+    done
 
 # remove any smylinkg for service which can sometimes cause issued during copy
 RUN rm -f /etc/service 2> /dev/null || true
