@@ -58,8 +58,10 @@ jobs:
             TAG: ubuntu22.04-cuda12.6.1
           - ROOT_IMAGE: nvidia/cuda:13.0.2-devel-ubuntu22.04
             TAG: ubuntu22.04-cuda13.0.2
-          #- ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu24.04
-          #  TAG: ubuntu24.04-cuda12.6.1
+          - ROOT_IMAGE: nvidia/cuda:12.6.1-devel-ubuntu24.04
+            TAG: ubuntu24.04-cuda12.6.1
+          - ROOT_IMAGE: nvidia/cuda:13.0.2-devel-ubuntu24.04
+            TAG: ubuntu24.04-cuda13.0.2
 
     continue-on-error: true
     steps:
