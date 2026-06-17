@@ -1,9 +1,9 @@
 #!/bin/sh -e
 
-mkdir -p /var/run/dbus
+mkdir -p /run/dbus /var/run/dbus
 
-# clear any old dbug pids
-rm -f /var/run/dbus/pid 2> /dev/null
+# Container restart preserves the writable runtime filesystem, so clear any
+# stale dbus state left behind by the previous boot before starting a new bus.
+rm -f /run/dbus/pid /var/run/dbus/pid /run/dbus/system_bus_socket /var/run/dbus/system_bus_socket 2> /dev/null
 
-exec /usr/bin/dbus-daemon --system --nofork 2>&1
-
+exec /usr/bin/dbus-daemon --system --nofork --nopidfile 2>&1
