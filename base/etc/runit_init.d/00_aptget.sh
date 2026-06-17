@@ -22,8 +22,15 @@ if [ ! -z "$INSTALL_REPOSITORY_SOURCES" ]; then
   IFS=',' read -ra KEY_ARRAY <<< "$INSTALL_REPOSITORY_KEYS"
   key_idx=0
   for key in "${KEY_ARRAY[@]}"; do
-    wget -qO "/etc/apt/trusted.gpg.d/ccc-custom-${key_idx}.asc" "$key" || echo "failed to fetch custom repository key: $key"
-    key_idx=$((key_idx+1))
+    [ -z "$key" ] && continue
+    tmp_key=$(mktemp)
+    if wget -qO "$tmp_key" "$key"; then
+      mv "$tmp_key" "/etc/apt/trusted.gpg.d/ccc-custom-${key_idx}.asc"
+      key_idx=$((key_idx+1))
+    else
+      rm -f "$tmp_key"
+      echo "failed to fetch custom repository key: $key"
+    fi
   done
   
   IFS=',' read -ra REPO_ARRAY <<< "$INSTALL_REPOSITORY_SOURCES"
