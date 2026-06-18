@@ -1,3 +1,12 @@
+Changes for v1.13:
+ - minor update:
+	- added CCC FUSE sidecar client shim integration for FUSE-enabled containers
+	- added startup relink hook for fusermount3/fusermount/fusemount helper names after package installs
+	- added /usr/local/bin/umount wrapper that delegates user unmounts to fusermount3 -u while preserving /bin/umount
+	- exported minimal container identity/FUSE variables to SSH sessions via sshd SetEnv for non-interactive commands
+	- mirrored the same safe runtime variables into /etc/environment for login/PAM environments
+	- documented the FUSE sidecar runtime contract and required ENABLE_FUSE deployment wiring
+
 Changes for v1.12:
  - minor update:
 	- implemented logging to /home/$USER/.containers/

@@ -28,6 +28,27 @@ See `scripts/branchfs-agent-mode.example.sh` for a dry-run wrapper sketch. It
 prints the BranchFS and bind-mount commands by default and only executes them
 when explicitly run with `CCC_BRANCHFS_EXAMPLE_APPLY=1`.
 
+Manual development image builds
+-------------------------------
+
+The repository contains a manual-only GitHub Actions workflow named `Docker Dev Image CI` for testing a single CCC image without publishing release/latest tags. Run it from the GitHub Actions UI and choose exactly one `image` to build. The default is `base`.
+
+Example base image run:
+
+ * `image`: `base`
+ * `root_image`: `nvidia/cuda:13.0.2-devel-ubuntu22.04`
+ * `tag`: `ubuntu22.04-cuda13.0.2`
+
+The workflow pushes one development tag to Docker Hub using the configured `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets:
+
+ * `vicoslab/ccc:base-dev-<tag>`
+ * `vicoslab/ccc:jupyter-dev-<tag>` for Ubuntu 22.04 tags, when `image` is `jupyter`
+ * `vicoslab/ccc:x2go-dev-<tag>` when `image` is `x2go`
+ * `vicoslab/ccc:xpra-dev-<tag>` for Ubuntu 22.04/24.04 tags, when `image` is `xpra`
+ * `vicoslab/ccc:vscode-dev-<tag>` when `image` is `vscode`
+
+For non-base images, `root_image` should be the parent CCC base image to extend, such as `vicoslab/ccc:base-dev-ubuntu22.04-cuda13.0.2`. The workflow is intentionally configured only with `workflow_dispatch`, so it does not run on pushes, pull requests, or tags.
+
 Base image
 ----------
 
@@ -64,9 +85,14 @@ FUSE support
 All CCC images support FUSE through [`ccc-fuse-sidecar`](https://github.com/vicoslab/ccc-fuse-sidecar) so compute containers do not need
 privileged access or `SYS_ADMIN`. The image includes a static `fusermount3` shim
 under `/opt/ccc-fuse-sidecar/bin` and relinks `fusermount3`/`fusermount` helper
-names during startup. The shim reads `CONTAINER_NAME` from the container
-environment and forwards it to the sidecar, allowing Docker-inspect path
-translation to identify the calling compute container.
+names during startup. Startup also places an `umount` wrapper in `/usr/local/bin`
+so normal user shells can run `umount /path/to/fuse-mount`; the wrapper execs
+`fusermount3 -u "$@"`, and the FUSE shim sends the request to the sidecar instead
+of requiring app-side `SYS_ADMIN`. The real system `/bin/umount` is left in place
+for root/system scripts that call it explicitly.
+The shim reads `CONTAINER_NAME` from the container environment and forwards it to
+the sidecar, allowing Docker-inspect path translation to identify the calling
+compute container.
 
 For this to work, the CCC deployment must provide the runtime pieces, not the
 image itself:
