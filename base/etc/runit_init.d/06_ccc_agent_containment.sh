@@ -16,7 +16,7 @@ if ! truthy "${CCC_AGENT_CONTAINMENT_ENABLE:-0}"; then
 fi
 
 repo="${CCC_AGENT_CONTAINMENT_REPO:-https://github.com/vicoslab/ccc-agent-containment.git}"
-ref="${CCC_AGENT_CONTAINMENT_REF:-main}"
+ref="${CCC_AGENT_CONTAINMENT_REF:-master}"
 install_dir="${CCC_AGENT_CONTAINMENT_INSTALL_DIR:-/opt/ccc-agent}"
 config_dir="${CCC_AGENT_CONTAINMENT_CONFIG_DIR:-/etc/ccc-agent}"
 config_file="${CCC_AGENT_CONFIG:-${config_dir}/config.json}"
@@ -24,6 +24,13 @@ link_dir="${CCC_AGENT_CONTAINMENT_LINK_DIR:-/usr/local/bin}"
 enable_shims="${CCC_AGENT_CONTAINMENT_ENABLE_SHIMS:-0}"
 shim_agents="${CCC_AGENT_CONTAINMENT_SHIM_AGENTS:-codex claude hermes opencode}"
 branchfs_bin="${CCC_AGENT_CONTAINMENT_BRANCHFS_BIN:-}"
+
+# Dependencies (bwrap + branchfs) are installed into system dirs so they are
+# always on PATH. branchfs is built from the vicoslab fork branch by default.
+install_deps="${CCC_AGENT_CONTAINMENT_INSTALL_DEPS:-1}"
+branchfs_repo="${CCC_AGENT_CONTAINMENT_BRANCHFS_REPO:-https://github.com/vicoslab/branchfs.git}"
+branchfs_ref="${CCC_AGENT_CONTAINMENT_BRANCHFS_REF:-feat/ccc-agent-containment}"
+branchfs_dest="${CCC_AGENT_CONTAINMENT_BRANCHFS_DEST:-/usr/local/bin/branchfs}"
 
 if ! command -v git >/dev/null 2>&1; then
     echo "ccc-agent-containment: git is required to install ${repo}" >&2
@@ -36,6 +43,93 @@ cleanup() {
     rm -rf "${tmpdir}"
 }
 trap cleanup EXIT INT TERM
+
+# --- system dependencies: bwrap + branchfs (installed into system dirs) -------
+# All installs are best-effort: a failure warns but never aborts container
+# startup, and everything is idempotent (skipped when already present).
+apt_get() { DEBIAN_FRONTEND=noninteractive apt-get "$@"; }
+
+ensure_libfuse() {
+    # branchfs links libfuse3 at runtime; make the shared lib available so the
+    # binary is callable without LD_LIBRARY_PATH. (Does NOT install fuse3 /
+    # fusermount3 — that stays the CCC sidecar shim.)
+    truthy "${install_deps}" || return 0
+    command -v apt-get >/dev/null 2>&1 || return 0
+    if ! ldconfig -p 2>/dev/null | grep -q 'libfuse3\.so'; then
+        apt_get update -qq || true
+        apt_get install -y --no-install-recommends libfuse3-3 \
+            || echo "ccc-agent-containment: warning: failed to install libfuse3 runtime" >&2
+    fi
+}
+
+ensure_bwrap() {
+    command -v bwrap >/dev/null 2>&1 && return 0
+    [ -n "${CCC_AGENT_CONTAINMENT_BWRAP_BIN:-}" ] && [ -x "${CCC_AGENT_CONTAINMENT_BWRAP_BIN}" ] && return 0
+    truthy "${install_deps}" || return 0
+    command -v apt-get >/dev/null 2>&1 || return 0
+    echo "ccc-agent-containment: installing bubblewrap (bwrap)"
+    apt_get update -qq || true
+    apt_get install -y --no-install-recommends bubblewrap \
+        || echo "ccc-agent-containment: warning: failed to install bubblewrap" >&2
+}
+
+ensure_branchfs() {
+    # Usable binary already provided/installed? Just make sure libfuse is there.
+    if { [ -n "${CCC_AGENT_CONTAINMENT_BRANCHFS_BIN:-}" ] && [ -x "${CCC_AGENT_CONTAINMENT_BRANCHFS_BIN}" ]; } \
+       || [ -x "${branchfs_dest}" ] || command -v branchfs >/dev/null 2>&1; then
+        ensure_libfuse
+        return 0
+    fi
+    truthy "${install_deps}" || { echo "ccc-agent-containment: branchfs missing and INSTALL_DEPS=0" >&2; return 0; }
+    command -v apt-get >/dev/null 2>&1 || { echo "ccc-agent-containment: no apt-get; cannot build branchfs" >&2; return 0; }
+
+    echo "ccc-agent-containment: building branchfs from ${branchfs_repo}@${branchfs_ref}"
+    apt_get update -qq || true
+    apt_get install -y --no-install-recommends \
+        libfuse3-dev pkg-config build-essential ca-certificates curl git \
+        || { echo "ccc-agent-containment: warning: branchfs build deps failed" >&2; return 0; }
+
+    # Rust toolchain (NOT present by default): prefer an existing cargo, then
+    # apt's cargo/rustc (branchfs is edition 2021, no MSRV pin -> apt rust is
+    # new enough), then a minimal rustup as a last resort.
+    cargo_bin="$(command -v cargo 2>/dev/null || true)"
+    if [ -z "${cargo_bin}" ]; then
+        echo "ccc-agent-containment: installing rust toolchain (cargo/rustc) via apt"
+        apt_get install -y --no-install-recommends cargo rustc || true
+        cargo_bin="$(command -v cargo 2>/dev/null || true)"
+    fi
+    if [ -z "${cargo_bin}" ]; then
+        echo "ccc-agent-containment: apt rust unavailable; installing via rustup"
+        export RUSTUP_HOME="${tmpdir}/rustup" CARGO_HOME="${tmpdir}/cargo"
+        curl -fsSL https://sh.rustup.rs \
+            | sh -s -- -y --no-modify-path --profile minimal >/dev/null 2>&1 || true
+        [ -x "${CARGO_HOME}/bin/cargo" ] && cargo_bin="${CARGO_HOME}/bin/cargo"
+    fi
+    if [ -z "${cargo_bin}" ]; then
+        echo "ccc-agent-containment: warning: no rust toolchain; cannot build branchfs" >&2
+        return 0
+    fi
+
+    bsrc="${tmpdir}/branchfs"
+    if ! git clone --depth 1 --branch "${branchfs_ref}" "${branchfs_repo}" "${bsrc}" 2>/dev/null; then
+        if ! { git clone "${branchfs_repo}" "${bsrc}" && git -C "${bsrc}" checkout "${branchfs_ref}"; }; then
+            echo "ccc-agent-containment: warning: branchfs clone failed" >&2
+            return 0
+        fi
+    fi
+    if ( cd "${bsrc}" && "${cargo_bin}" build --release ); then
+        if install -m 0755 "${bsrc}/target/release/branchfs" "${branchfs_dest}"; then
+            echo "ccc-agent-containment: installed branchfs -> ${branchfs_dest}"
+        else
+            echo "ccc-agent-containment: warning: failed to install branchfs binary" >&2
+        fi
+    else
+        echo "ccc-agent-containment: warning: branchfs build failed" >&2
+    fi
+}
+
+ensure_bwrap
+ensure_branchfs
 
 src="${tmpdir}/src"
 echo "ccc-agent-containment: installing ${repo}@${ref} into ${install_dir}"

@@ -122,17 +122,31 @@ Useful optional variables:
 
 ```bash
 CCC_AGENT_CONTAINMENT_REPO=https://github.com/vicoslab/ccc-agent-containment.git
-CCC_AGENT_CONTAINMENT_REF=main
+CCC_AGENT_CONTAINMENT_REF=master
 CCC_AGENT_CONTAINMENT_INSTALL_DIR=/opt/ccc-agent
 CCC_AGENT_CONTAINMENT_ENABLE_SHIMS=0     # 1 = install codex/claude/... PATH shims
 CCC_AGENT_CONTAINMENT_REGISTER_HOOKS=    # default = ENABLE_SHIMS; 1 to register hooks
-CCC_AGENT_CONTAINMENT_BRANCHFS_BIN=/path/to/branchfs
-CCC_AGENT_CONTAINMENT_BWRAP_BIN=/path/to/bwrap
+# Dependency install (bwrap + branchfs) into system dirs:
+CCC_AGENT_CONTAINMENT_INSTALL_DEPS=1     # 0 to skip apt/cargo installs
+CCC_AGENT_CONTAINMENT_BRANCHFS_REPO=https://github.com/vicoslab/branchfs.git
+CCC_AGENT_CONTAINMENT_BRANCHFS_REF=feat/ccc-agent-containment
+CCC_AGENT_CONTAINMENT_BRANCHFS_DEST=/usr/local/bin/branchfs
+CCC_AGENT_CONTAINMENT_BRANCHFS_BIN=     # prebuilt branchfs; set to skip the build
+CCC_AGENT_CONTAINMENT_BWRAP_BIN=        # prebuilt bwrap; set to skip apt install
 CCC_AGENT_CONFIG=/etc/ccc-agent/config.json
 ```
 
-When enabled, startup clones the external runtime, installs the runtime files
-under `/opt/ccc-agent`, resolves the `branchfs` and `bwrap` binaries, links
+When enabled, startup **installs the dependencies into system dirs** so they
+are always on `PATH`: `bwrap` via `apt-get install bubblewrap` (→ `/usr/bin`),
+and `branchfs` built from the vicoslab fork branch
+(`vicoslab/branchfs@feat/ccc-agent-containment` by default) and installed to
+`/usr/local/bin/branchfs` (also installs `libfuse3` so the binary runs without
+`LD_LIBRARY_PATH`). Both installs are **idempotent** (skipped when already
+present) and **best-effort** (a failure warns but never aborts startup); set a
+`*_BIN` var to supply a prebuilt binary and skip building, or
+`CCC_AGENT_CONTAINMENT_INSTALL_DEPS=0` to skip installs entirely.
+
+It then clones the external runtime under `/opt/ccc-agent`, links
 `ccc-agent-run`, `ccc-agent-launch`, and `ccc-agentctl` into `/usr/local/bin`,
 and generates a root-owned default `/etc/ccc-agent/config.json` if missing. The
 default config is **bwrap confinement** (rootless; needs unprivileged user
@@ -142,9 +156,10 @@ enabled it also registers the Claude Code Stop hook (managed settings) and the
 codex `notify` hook so interactive agents commit per turn.
 
 Requirements for bwrap confinement: the container must allow **unprivileged
-user namespaces** and **bubblewrap** must be installed (or
-`CCC_AGENT_CONTAINMENT_BWRAP_BIN` set). For interactive agents running as the
-real (non-root) uid, fresh `--proc` needs the container's masked `/proc` cleared
+user namespaces**. The build also needs network access (apt + the branchfs git
+repo + the rust toolchain) on first start; thereafter the system binaries are
+reused. For interactive agents running as the real (non-root) uid, fresh
+`--proc` needs the container's masked `/proc` cleared
 (`--security-opt systempaths=unconfined`); the default `bwrap_proc_mode: bind`
 works without that. Commit/review policy lives entirely in the external runtime;
 CCC image startup only performs opt-in installation/wiring. See the
