@@ -24,6 +24,10 @@ on:
         description: "CCC image TAG suffix, e.g. ubuntu22.04-cuda13.0.2"
         required: true
         default: "ubuntu22.04-cuda13.0.2"
+      fuse_sidecar_image:
+        description: "CCC FUSE Sidecar Client image"
+        required: true
+        default: "vicoslab/ccc-fuse-sidecar:client-latest"
       dev_prefix:
         description: "Development tag prefix inserted before TAG"
         required: true
@@ -60,6 +64,7 @@ jobs:
           DOCKER_BUILDKIT: "0"
           IMAGE: ${{ inputs.image }}
           ROOT_IMAGE: ${{ inputs.root_image }}
+          FUSE_SIDECAR_CLIENT_IMAGE: ${{ inputs.fuse_sidecar_image }}
           TAG: ${{ inputs.tag }}
           DEV_PREFIX: ${{ inputs.dev_prefix }}
           IMAGE_REPOSITORY: ${{ inputs.image_repository }}
@@ -137,6 +142,7 @@ jobs:
           echo "::group::Build ${IMAGE_REF}"
           docker build --pull -t "${IMAGE_REF}" \
             --build-arg "ROOT_IMAGE=${ROOT_IMAGE}" \
+            --build-arg "CCC_FUSE_CLIENT_IMAGE=${FUSE_SIDECAR_CLIENT_IMAGE}" \
             "${EXTRA_BUILD_ARGS[@]}" \
             "${CONTEXT}"
           echo "::endgroup::"
