@@ -4,6 +4,30 @@ Conda Compute Containers
 Contains build files for containers that use Conda in users directory (mounted as a persistent volume) for further package installation. The image itself is not writeable by the user.
 Images also contain basic labels that are used to configure FRP port proxying.
 
+BranchFS agent/training mode
+----------------------------
+
+Future BranchFS-backed agent and training container ideas are documented in
+`docs/branchfs-agent-mode.md`. The notes and example wrapper are non-production
+scaffolding only; they do not change Ansible deployment or image startup
+behavior.
+
+The proposed mode protects writable CCC data mounts by exposing BranchFS branch
+views to agent/training containers while keeping the real NFS underlays and
+commit-capable BranchFS controls in a trusted launcher/review sidecar. Important
+constraints are:
+
+ * `/home/$USER` must be exposed as a subpath of the same `/storage/user` branch,
+   not as an independent branch root.
+ * agent-visible BranchFS mounts should use `branchfs mount --agent` or
+   `--no-control` so `.branchfs_ctl` and `@branch` are hidden.
+ * multi-node training should write disjoint per-node/per-rank files; same-path
+   write/delete/rename races are outside the relaxed-mode guarantee.
+
+See `scripts/branchfs-agent-mode.example.sh` for a dry-run wrapper sketch. It
+prints the BranchFS and bind-mount commands by default and only executes them
+when explicitly run with `CCC_BRANCHFS_EXAMPLE_APPLY=1`.
+
 Manual development image builds
 -------------------------------
 
@@ -81,6 +105,51 @@ image itself:
 ```
 
 You do not need `--privileged` or app-side `--cap-add SYS_ADMIN`.
+
+Agent containment runtime
+-------------------------
+
+CCC agent filesystem containment now lives in the separate
+`ccc-agent-containment` repository. The CCC image does not include or enable it
+by default. At runit startup, the base image only installs the external runtime
+when explicitly requested:
+
+```bash
+-e CCC_AGENT_CONTAINMENT_ENABLE=1
+```
+
+Useful optional variables:
+
+```bash
+CCC_AGENT_CONTAINMENT_REPO=https://github.com/vicoslab/ccc-agent-containment.git
+CCC_AGENT_CONTAINMENT_REF=main
+CCC_AGENT_CONTAINMENT_INSTALL_DIR=/opt/ccc-agent
+CCC_AGENT_CONTAINMENT_ENABLE_SHIMS=0     # 1 = install codex/claude/... PATH shims
+CCC_AGENT_CONTAINMENT_REGISTER_HOOKS=    # default = ENABLE_SHIMS; 1 to register hooks
+CCC_AGENT_CONTAINMENT_BRANCHFS_BIN=/path/to/branchfs
+CCC_AGENT_CONTAINMENT_BWRAP_BIN=/path/to/bwrap
+CCC_AGENT_CONFIG=/etc/ccc-agent/config.json
+```
+
+When enabled, startup clones the external runtime, installs the runtime files
+under `/opt/ccc-agent`, resolves the `branchfs` and `bwrap` binaries, links
+`ccc-agent-run`, `ccc-agent-launch`, and `ccc-agentctl` into `/usr/local/bin`,
+and generates a root-owned default `/etc/ccc-agent/config.json` if missing. The
+default config is **bwrap confinement** (rootless; needs unprivileged user
+namespaces, no `CAP_SYS_ADMIN`) with the agent's `~/.codex`/`~/.claude` exposed
+read-only for auth and the agents' config/cache dirs ignored. With shims/hooks
+enabled it also registers the Claude Code Stop hook (managed settings) and the
+codex `notify` hook so interactive agents commit per turn.
+
+Requirements for bwrap confinement: the container must allow **unprivileged
+user namespaces** and **bubblewrap** must be installed (or
+`CCC_AGENT_CONTAINMENT_BWRAP_BIN` set). For interactive agents running as the
+real (non-root) uid, fresh `--proc` needs the container's masked `/proc` cleared
+(`--security-opt systempaths=unconfined`); the default `bwrap_proc_mode: bind`
+works without that. Commit/review policy lives entirely in the external runtime;
+CCC image startup only performs opt-in installation/wiring. See the
+`ccc-agent-containment` repo's `docs/agent-integration.md` for hook registration
+and credential details.
 
 VS Code
 -------
