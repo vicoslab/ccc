@@ -62,6 +62,8 @@ config_file="${CCC_AGENT_CONFIG:-${config_dir}/config.json}"
 link_dir="${CCC_AGENT_CONTAINMENT_LINK_DIR:-/usr/local/bin}"
 enable_shims="${CCC_AGENT_CONTAINMENT_ENABLE_SHIMS:-0}"
 shim_agents="${CCC_AGENT_CONTAINMENT_SHIM_AGENTS:-codex claude hermes opencode}"
+conda_activate_shims="${CCC_AGENT_CONTAINMENT_CONDA_ACTIVATE_SHIMS:-${enable_shims}}"
+conda_prefix="${CCC_AGENT_CONTAINMENT_CONDA_PREFIX:-${CONDA_PREFIX:-}}"
 
 install_deps="${CCC_AGENT_CONTAINMENT_INSTALL_DEPS:-1}"
 branchfs_bin="${CCC_AGENT_CONTAINMENT_BRANCHFS_BIN:-}"
@@ -272,7 +274,20 @@ run_wire() {
     state_dir="${CCC_AGENT_STATE_DIR:-/storage/user/.ccc-agents}"
     branch_store="${CCC_AGENT_BRANCH_STORE:-/storage/user/.ccc-agents}"
     container_name="${CCC_AGENT_CONTAINER_NAME:-${CONTAINER_NAME:-}}"
-    
+
+    # CCC's miniconda bootstrap installs the default env under /home/$USER/conda
+    # and activates it from shell startup files.  The runit wiring environment is
+    # not itself a user login shell, so CONDA_PREFIX is often unset here even
+    # though later agent shells will activate that env.  Auto-discover that prefix
+    # so the image can install conda activation hooks without requiring another
+    # env knob.  If no conda env is present, skip hook installation rather than
+    # creating a bogus prefix directory.
+    conda_prefix_resolved="${conda_prefix}"
+    if [ -z "${conda_prefix_resolved}" ]; then
+        for d in "/home/${USER_NAME:-user}/conda" "/home/${USER_NAME:-user}/miniconda3" "/opt/conda"; do
+            [ -d "${d}" ] && { conda_prefix_resolved="${d}"; break; }
+        done
+    fi
 
     register_hooks="${CCC_AGENT_CONTAINMENT_REGISTER_HOOKS:-${enable_shims}}"
     set -- --system --config "${config_file}" --user-name "${USER_NAME:-user}" \
@@ -282,6 +297,17 @@ run_wire() {
     [ -n "${state_dir}" ] && set -- "$@" --state-dir "${state_dir}"
     truthy "${register_hooks}" || set -- "$@" --no-hooks
     truthy "${enable_shims}" && set -- "$@" --enable-shims --shim-agents "${shim_agents}" --link-dir "${link_dir}"
+    if truthy "${conda_activate_shims}"; then
+        if [ -n "${conda_prefix_resolved}" ] && { [ -n "${conda_prefix}" ] || [ -d "${conda_prefix_resolved}" ]; }; then
+            if "${setup_bin}" --help 2>&1 | grep -q -- '--conda-activate-shims'; then
+                set -- "$@" --conda-activate-shims --conda-prefix "${conda_prefix_resolved}"
+            else
+                echo "ccc-agent-containment: warning: installed ccc-agent-setup lacks --conda-activate-shims; conda-installed agents may bypass PATH shims. Set CCC_AGENT_CONTAINMENT_UPDATE=1 and restart." >&2
+            fi
+        else
+            echo "ccc-agent-containment: conda shim hooks requested but no conda prefix found; set CCC_AGENT_CONTAINMENT_CONDA_PREFIX to enable them" >&2
+        fi
+    fi
     "${setup_bin}" "$@"
     echo "ccc-agent-containment: wired; CCC_AGENT_CONFIG=${config_file}"
 }

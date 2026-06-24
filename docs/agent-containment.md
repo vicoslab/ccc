@@ -30,6 +30,10 @@ CCC_AGENT_CONTAINMENT_REPO=https://github.com/vicoslab/ccc-agent-containment.git
 CCC_AGENT_CONTAINMENT_REF=master
 CCC_AGENT_CONTAINMENT_INSTALL_DIR=/opt/ccc-agent
 CCC_AGENT_CONTAINMENT_ENABLE_SHIMS=0     # 1 = install codex/claude/... PATH shims
+CCC_AGENT_CONTAINMENT_LINK_DIR=/usr/local/bin  # trusted shim dir; prepended ahead of conda envs
+CCC_AGENT_CONTAINMENT_SHIM_AGENTS="codex claude hermes opencode"
+CCC_AGENT_CONTAINMENT_CONDA_ACTIVATE_SHIMS=    # default = ENABLE_SHIMS; installs conda activation hooks when a prefix exists
+CCC_AGENT_CONTAINMENT_CONDA_PREFIX=            # default: $CONDA_PREFIX, then /home/$USER/conda, /home/$USER/miniconda3, /opt/conda
 CCC_AGENT_CONTAINMENT_REGISTER_HOOKS=    # default = ENABLE_SHIMS; 1 to register hooks
 # Dependency install (bwrap + branchfs) into system dirs:
 CCC_AGENT_CONTAINMENT_INSTALL_DEPS=1     # 0 to skip apt/cargo installs
@@ -120,10 +124,22 @@ It then installs the runtime (pip package under `/usr`), links `ccc-agent-run`,
 `ccc-agent-launch`, and `ccc-agentctl` into `/usr/local/bin`, and generates a
 root-owned `/etc/ccc-agent/config.json`. The default config is **bwrap
 confinement** (rootless; needs unprivileged user namespaces, no
-`CAP_SYS_ADMIN`) with the agent's `~/.codex`/`~/.claude` exposed read-only for
-auth and the agents' config/cache dirs ignored. With shims/hooks enabled it also
-registers the Claude Code Stop hook (managed settings) and the codex `notify`
-hook so interactive agents commit per turn.
+`CAP_SYS_ADMIN`) with the agent's `~/.codex`/`~/.claude` state dirs writable in
+the BranchFS view and ignored by policy. With shims/hooks enabled it also
+registers the Claude Code Stop hook and the codex `notify` hook so interactive
+agents commit per turn.
+
+For transparent shims, conda needs one extra PATH step: activated conda envs put
+`$CONDA_PREFIX/bin` before `/usr/local/bin`, so a `codex`/`claude` installed in
+conda would otherwise bypass the system shim. Therefore, when
+`CCC_AGENT_CONTAINMENT_ENABLE_SHIMS=1`, startup also defaults
+`CCC_AGENT_CONTAINMENT_CONDA_ACTIVATE_SHIMS=1` and writes conda
+`activate.d`/`deactivate.d` hooks when it can find a conda prefix (`$CONDA_PREFIX`,
+`/home/$USER/conda`, `/home/$USER/miniconda3`, or `/opt/conda`). Those hooks
+re-prepend the trusted shim dir ahead of `$CONDA_PREFIX/bin`, so shell lookup
+hits the CCC shim first while the shim still resolves the real agent binary from
+the active env. Set `CCC_AGENT_CONTAINMENT_CONDA_PREFIX` for a non-standard env,
+or `CCC_AGENT_CONTAINMENT_CONDA_ACTIVATE_SHIMS=0` to disable this wiring.
 
 ## Requirements
 
