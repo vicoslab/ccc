@@ -253,6 +253,16 @@ run_wire() {
     fi
     [ -n "${setup_bin}" ] || { echo "ccc-agent-containment: ERROR: ccc-agent-setup not found (run the install phase first)" >&2; return 1; }
 
+    # Version-skew guard: this image's wiring passes the /storage-layout flags
+    # (--storage-root etc.), which an older installed ccc-agent-containment does
+    # not understand.  Detect that instead of crashing with an argparse dump or,
+    # worse, silently wiring the wrong (legacy) layout.
+    if ! "${setup_bin}" --help 2>&1 | grep -q -- '--storage-root'; then
+        echo "ccc-agent-containment: ERROR: installed ccc-agent-setup predates the /storage-layout flags (--storage-root); cannot wire the storage layout." >&2
+        echo "ccc-agent-containment: update the runtime to a build that has them, e.g. set CCC_AGENT_CONTAINMENT_UPDATE=1 (optionally with CCC_AGENT_CONTAINMENT_REF / _REPO pointing at that build) and restart." >&2
+        return 1
+    fi
+
     # Path wiring (only known at runtime, never at build): CCC mounts the user's
     # storage at /storage and the home at /storage/user/<container>.  The agent
     # gets ONE BranchFS branch over all of /storage (read-through), with deltas
@@ -276,6 +286,13 @@ run_wire() {
 
 # =============================================================================
 
-[ "${do_install}" = 1 ] && run_install
-[ "${do_wire}" = 1 ] && run_wire
+# Best-effort: a phase failure warns but never aborts container startup (see the
+# contract in the header). At build time (--install-only via the Dockerfile) a
+# real failure should still surface, so only soften at runtime (when wiring).
+if [ "${do_wire}" = 1 ]; then
+    [ "${do_install}" = 1 ] && { run_install || echo "ccc-agent-containment: install phase failed (best-effort; continuing)" >&2; }
+    run_wire || echo "ccc-agent-containment: wire phase failed (best-effort; continuing)" >&2
+else
+    [ "${do_install}" = 1 ] && run_install
+fi
 exit 0
