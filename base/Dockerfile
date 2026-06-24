@@ -48,6 +48,30 @@ RUN set -eux; \
         ln -sfn /opt/ccc-fuse-sidecar/bin/fusermount3 "$dir/fusemount"; \
     done
 
+# Optionally bake the ccc-agent-containment runtime (bwrap + branchfs binary +
+# the ccc-agent-containment pip package) into the image so an enabled container
+# starts instantly instead of building rust/branchfs on first boot.  Off by
+# default to keep base images lean; build with
+#   --build-arg CCC_AGENT_CONTAINMENT_PREINSTALL=1
+# The runit startup (etc/runit_init.d/06_ccc_agent_containment.sh) still runs at
+# boot and reinstalls/updates only when a NEWER ref is requested via env
+# (CCC_AGENT_CONTAINMENT_REF / _BRANCHFS_REF, or *_UPDATE=1).  Keep these ref
+# defaults in sync with setup_ccc_agents.sh so a stock container is a no-op.
+ARG CCC_AGENT_CONTAINMENT_PREINSTALL=0
+ARG CCC_AGENT_CONTAINMENT_REF=master
+ARG CCC_AGENT_CONTAINMENT_BRANCHFS_REF=feat/ccc-agent-containment
+RUN set -eux; \
+    case "${CCC_AGENT_CONTAINMENT_PREINSTALL}" in \
+        1|true|TRUE|yes|YES|on|ON) \
+            CCC_AGENT_CONTAINMENT_REF="${CCC_AGENT_CONTAINMENT_REF}" \
+            CCC_AGENT_CONTAINMENT_BRANCHFS_REF="${CCC_AGENT_CONTAINMENT_BRANCHFS_REF}" \
+                sh /etc/setup_ccc_agents.sh --install-only; \
+            apt-get clean; \
+            rm -rf /var/lib/apt/lists/*; \
+            ;; \
+        *) echo "ccc-agent-containment: PREINSTALL off; runtime install at first boot"; ;; \
+    esac
+
 EXPOSE 22
 LABEL frp.enabled="true" frp.22="tcp"
 

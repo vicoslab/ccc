@@ -111,12 +111,20 @@ Agent containment runtime
 
 CCC agent filesystem containment now lives in the separate
 `ccc-agent-containment` repository. The CCC image does not include or enable it
-by default. At runit startup, the base image only installs the external runtime
+by default. At runit startup, the base image only activates the external runtime
 when explicitly requested:
 
 ```bash
 -e CCC_AGENT_CONTAINMENT_ENABLE=1
 ```
+
+The install/update logic is a single shared script, `/etc/setup_ccc_agents.sh`,
+invoked from two places: the **image build** (to bake the runtime in, see
+*Baking it into the image* below) and **runit startup**
+(`etc/runit_init.d/06_ccc_agent_containment.sh`, behind the enable flag). The
+startup call installs at first boot if nothing is baked in, and otherwise is a
+fast no-op that only rebuilds/re-pips when a **newer ref** is requested via env
+(see *Updating* below).
 
 Useful optional variables:
 
@@ -134,7 +142,43 @@ CCC_AGENT_CONTAINMENT_BRANCHFS_DEST=/usr/local/bin/branchfs
 CCC_AGENT_CONTAINMENT_BRANCHFS_BIN=     # prebuilt branchfs; set to skip the build
 CCC_AGENT_CONTAINMENT_BWRAP_BIN=        # prebuilt bwrap; set to skip apt install
 CCC_AGENT_CONFIG=/etc/ccc-agent/config.json
+# Updating a baked-in image at runtime (see "Updating"):
+CCC_AGENT_CONTAINMENT_UPDATE=0           # 1 = force refresh pip pkg + branchfs
+CCC_AGENT_CONTAINMENT_BRANCHFS_UPDATE=0  # 1 = force rebuild branchfs only
 ```
+
+### Baking it into the image (recommended)
+
+Building rust + branchfs on first boot takes minutes. Build the **base** image
+with the runtime baked in so an enabled container starts instantly (derived
+images — VS Code, Jupyter, … — inherit it from the base):
+
+```bash
+docker build base/ \
+  --build-arg CCC_AGENT_CONTAINMENT_PREINSTALL=1 \
+  --build-arg CCC_AGENT_CONTAINMENT_REF=master \
+  --build-arg CCC_AGENT_CONTAINMENT_BRANCHFS_REF=feat/ccc-agent-containment
+```
+
+This runs `/etc/setup_ccc_agents.sh --install-only` at build time (bwrap +
+branchfs binary + the pip package; user-specific config/hooks are still wired at
+startup). It is **off by default** to keep base images lean. The build-arg ref
+defaults match the runtime defaults, so a stock baked image is a no-op at boot.
+
+### Updating
+
+A baked-in image is pinned to the refs it was built with (recorded in markers
+under `/opt/ccc-agent`). To pull a newer version at container start, request a
+different ref — only the changed component is rebuilt/re-pipped:
+
+```bash
+-e CCC_AGENT_CONTAINMENT_REF=v1.2.0            # newer pip package
+-e CCC_AGENT_CONTAINMENT_BRANCHFS_REF=v0.5.0   # newer branchfs
+```
+
+If the ref name is unchanged but the branch has advanced (new commits), force a
+refresh with `-e CCC_AGENT_CONTAINMENT_UPDATE=1` (or
+`CCC_AGENT_CONTAINMENT_BRANCHFS_UPDATE=1` for just branchfs).
 
 When enabled, startup **installs the dependencies into system dirs** so they
 are always on `PATH`: `bwrap` via `apt-get install bubblewrap` (→ `/usr/bin`),
