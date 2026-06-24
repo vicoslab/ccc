@@ -89,24 +89,28 @@ ensure_branchfs() {
         libfuse3-dev pkg-config build-essential ca-certificates curl git \
         || { echo "ccc-agent-containment: warning: branchfs build deps failed" >&2; return 0; }
 
-    # Rust toolchain (NOT present by default): prefer an existing cargo, then
-    # apt's cargo/rustc (branchfs is edition 2021, no MSRV pin -> apt rust is
-    # new enough), then a minimal rustup as a last resort.
-    cargo_bin="$(command -v cargo 2>/dev/null || true)"
-    if [ -z "${cargo_bin}" ]; then
-        echo "ccc-agent-containment: installing rust toolchain (cargo/rustc) via apt"
-        apt_get install -y --no-install-recommends cargo rustc || true
-        cargo_bin="$(command -v cargo 2>/dev/null || true)"
+    # Rust toolchain (NOT present by default).  branchfs ships a v4 Cargo.lock,
+    # which needs cargo >= 1.78 -- newer than apt's cargo on every current
+    # Ubuntu (apt cargo is ~1.75 and fails with "lock file version 4 requires
+    # -Znext-lockfile-bump").  So use an existing cargo ONLY if it is new
+    # enough, otherwise install a current toolchain via rustup.
+    cargo_bin=""
+    existing="$(command -v cargo 2>/dev/null || true)"
+    if [ -n "${existing}" ] && "${existing}" --version 2>/dev/null \
+         | awk '{split($2,a,"."); exit !(a[1]>1 || (a[1]==1 && a[2]>=78))}'; then
+        cargo_bin="${existing}"
+    elif [ -n "${existing}" ]; then
+        echo "ccc-agent-containment: cargo $(${existing} --version 2>/dev/null | awk '{print $2}') too old for branchfs (Cargo.lock v4 needs >= 1.78); using rustup"
     fi
     if [ -z "${cargo_bin}" ]; then
-        echo "ccc-agent-containment: apt rust unavailable; installing via rustup"
+        echo "ccc-agent-containment: installing a current rust toolchain via rustup"
         export RUSTUP_HOME="${tmpdir}/rustup" CARGO_HOME="${tmpdir}/cargo"
         curl -fsSL https://sh.rustup.rs \
             | sh -s -- -y --no-modify-path --profile minimal >/dev/null 2>&1 || true
         [ -x "${CARGO_HOME}/bin/cargo" ] && cargo_bin="${CARGO_HOME}/bin/cargo"
     fi
     if [ -z "${cargo_bin}" ]; then
-        echo "ccc-agent-containment: warning: no rust toolchain; cannot build branchfs" >&2
+        echo "ccc-agent-containment: warning: no suitable rust toolchain; cannot build branchfs" >&2
         return 0
     fi
 
