@@ -79,11 +79,8 @@ repo, is **off by default**, and is enabled per container with:
 -e CCC_AGENT_CONTAINMENT_ENABLE=1
 ```
 
-See [`docs/agent-containment.md`](docs/agent-containment.md) for the full setup
-(storage/path wiring, env vars, baking it into the image, updating) and
-[`docs/branchfs-agent-mode.md`](docs/branchfs-agent-mode.md) for the underlying
-BranchFS design rationale and the distributed-training use of the same branch
-mechanism.
+See [`docs/agent-containment.md`](docs/agent-containment.md) for the full setup:
+storage/path wiring, env vars, baking it into the image, and updating.
 
 VS Code
 -------
