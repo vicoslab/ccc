@@ -137,15 +137,39 @@ CCC_AGENT_CONTAINMENT_REGISTER_HOOKS=    # default = ENABLE_SHIMS; 1 to register
 # Dependency install (bwrap + branchfs) into system dirs:
 CCC_AGENT_CONTAINMENT_INSTALL_DEPS=1     # 0 to skip apt/cargo installs
 CCC_AGENT_CONTAINMENT_BRANCHFS_REPO=https://github.com/vicoslab/branchfs.git
-CCC_AGENT_CONTAINMENT_BRANCHFS_REF=feat/ccc-agent-containment
+CCC_AGENT_CONTAINMENT_BRANCHFS_REF=master
 CCC_AGENT_CONTAINMENT_BRANCHFS_DEST=/usr/local/bin/branchfs
 CCC_AGENT_CONTAINMENT_BRANCHFS_BIN=     # prebuilt branchfs; set to skip the build
 CCC_AGENT_CONTAINMENT_BWRAP_BIN=        # prebuilt bwrap; set to skip apt install
 CCC_AGENT_CONFIG=/etc/ccc-agent/config.json
+# Storage/path wiring (resolved at startup; see "How the storage is wired"):
+CCC_AGENT_STORAGE_ROOT=/storage          # real underlay, branched once
+CCC_AGENT_BRANCH_STORE=/opt/branchfs_branches  # node-local deltas (must be OFF /storage)
+CCC_AGENT_STATE_DIR=                      # default /opt/ccc-agent/state (node-local)
+# CONTAINER_NAME (already set by CCC) maps $HOME to /storage/user/$CONTAINER_NAME.
 # Updating a baked-in image at runtime (see "Updating"):
 CCC_AGENT_CONTAINMENT_UPDATE=0           # 1 = force refresh pip pkg + branchfs
 CCC_AGENT_CONTAINMENT_BRANCHFS_UPDATE=0  # 1 = force rebuild branchfs only
 ```
+
+### How the storage is wired
+
+CCC bind-mounts the user's storage at `/storage` and the user's home to the
+**same bytes** as `/storage/user/$CONTAINER_NAME`. To avoid branching that data
+twice, the runtime creates **one** BranchFS branch over all of `/storage`
+(read-through), keeps the deltas in a node-local store **outside** `/storage`
+(`/opt/branchfs_branches`), and inside the sandbox:
+
+- mounts that single branch back at `/storage` (so the agent reads all of
+  `/storage` but every write is captured as a branch delta, never the real NFS);
+- bind-mounts the branch's `user/$CONTAINER_NAME` subdir to `/home/$USER`, so the
+  home and `/storage/user/$CONTAINER_NAME` are the same branch — not two
+  overlays of the same data.
+
+Policy auto-commits changes under the home (the workspace) and flags writes
+anywhere else under `/storage` (datasets, group, other users) for review. The
+`config.json` is generated at **container startup** by `ccc-agent-setup` (it
+needs these runtime-only paths), never at image build.
 
 ### Baking it into the image (recommended)
 
@@ -157,7 +181,7 @@ images — VS Code, Jupyter, … — inherit it from the base):
 docker build base/ \
   --build-arg CCC_AGENT_CONTAINMENT_PREINSTALL=1 \
   --build-arg CCC_AGENT_CONTAINMENT_REF=master \
-  --build-arg CCC_AGENT_CONTAINMENT_BRANCHFS_REF=feat/ccc-agent-containment
+  --build-arg CCC_AGENT_CONTAINMENT_BRANCHFS_REF=master
 ```
 
 This runs `/etc/setup_ccc_agents.sh --install-only` at build time (bwrap +

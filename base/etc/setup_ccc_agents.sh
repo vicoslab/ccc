@@ -66,7 +66,7 @@ shim_agents="${CCC_AGENT_CONTAINMENT_SHIM_AGENTS:-codex claude hermes opencode}"
 install_deps="${CCC_AGENT_CONTAINMENT_INSTALL_DEPS:-1}"
 branchfs_bin="${CCC_AGENT_CONTAINMENT_BRANCHFS_BIN:-}"
 branchfs_repo="${CCC_AGENT_CONTAINMENT_BRANCHFS_REPO:-https://github.com/vicoslab/branchfs.git}"
-branchfs_ref="${CCC_AGENT_CONTAINMENT_BRANCHFS_REF:-feat/ccc-agent-containment}"
+branchfs_ref="${CCC_AGENT_CONTAINMENT_BRANCHFS_REF:-master}"
 branchfs_dest="${CCC_AGENT_CONTAINMENT_BRANCHFS_DEST:-/usr/local/bin/branchfs}"
 
 # Force-update toggles (refresh even when the ref name is unchanged).
@@ -253,12 +253,21 @@ run_wire() {
     fi
     [ -n "${setup_bin}" ] || { echo "ccc-agent-containment: ERROR: ccc-agent-setup not found (run the install phase first)" >&2; return 1; }
 
+    # Path wiring (only known at runtime, never at build): CCC mounts the user's
+    # storage at /storage and the home at /storage/user/<container>.  The agent
+    # gets ONE BranchFS branch over all of /storage (read-through), with deltas
+    # in a node-local store OUTSIDE /storage, mounted back at /storage in the
+    # sandbox; $HOME maps to <storage>/user/<container> of that same branch.
+    storage_root="${CCC_AGENT_STORAGE_ROOT:-/storage}"
+    branch_store="${CCC_AGENT_BRANCH_STORE:-/opt/branchfs_branches}"
+    container_name="${CCC_AGENT_CONTAINER_NAME:-${CONTAINER_NAME:-}}"
+
     register_hooks="${CCC_AGENT_CONTAINMENT_REGISTER_HOOKS:-${enable_shims}}"
     set -- --system --config "${config_file}" --user-name "${USER_NAME:-user}" \
-        --branchfs-bin "${branchfs_resolved}" --bwrap-bin "${bwrap_resolved}"
+        --branchfs-bin "${branchfs_resolved}" --bwrap-bin "${bwrap_resolved}" \
+        --storage-root "${storage_root}" --branch-store "${branch_store}"
+    [ -n "${container_name}" ] && set -- "$@" --container-name "${container_name}"
     [ -n "${CCC_AGENT_STATE_DIR:-}" ] && set -- "$@" --state-dir "${CCC_AGENT_STATE_DIR}"
-    [ -n "${CCC_AGENT_STORAGE_USER_BASE:-}" ] && set -- "$@" --storage-base "${CCC_AGENT_STORAGE_USER_BASE}"
-    [ -n "${CCC_AGENT_STORAGE_USER_STORE:-}" ] && set -- "$@" --storage-store "${CCC_AGENT_STORAGE_USER_STORE}"
     truthy "${register_hooks}" || set -- "$@" --no-hooks
     truthy "${enable_shims}" && set -- "$@" --enable-shims --shim-agents "${shim_agents}" --link-dir "${link_dir}"
     "${setup_bin}" "$@"
