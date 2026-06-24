@@ -269,15 +269,17 @@ run_wire() {
     # in a node-local store OUTSIDE /storage, mounted back at /storage in the
     # sandbox; $HOME maps to <storage>/user/<container> of that same branch.
     storage_root="${CCC_AGENT_STORAGE_ROOT:-/storage}"
-    branch_store="${CCC_AGENT_BRANCH_STORE:-/opt/branchfs_branches}"
+    state_dir="${CCC_AGENT_STATE_DIR:-/storage/user/.ccc-agents}"
+    branch_store="${CCC_AGENT_BRANCH_STORE:-/storage/user/.ccc-agents}"
     container_name="${CCC_AGENT_CONTAINER_NAME:-${CONTAINER_NAME:-}}"
+    
 
     register_hooks="${CCC_AGENT_CONTAINMENT_REGISTER_HOOKS:-${enable_shims}}"
     set -- --system --config "${config_file}" --user-name "${USER_NAME:-user}" \
         --branchfs-bin "${branchfs_resolved}" --bwrap-bin "${bwrap_resolved}" \
         --storage-root "${storage_root}" --branch-store "${branch_store}"
     [ -n "${container_name}" ] && set -- "$@" --container-name "${container_name}"
-    [ -n "${CCC_AGENT_STATE_DIR:-}" ] && set -- "$@" --state-dir "${CCC_AGENT_STATE_DIR}"
+    [ -n "${state_dir}" ] && set -- "$@" --state-dir "${state_dir}"
     truthy "${register_hooks}" || set -- "$@" --no-hooks
     truthy "${enable_shims}" && set -- "$@" --enable-shims --shim-agents "${shim_agents}" --link-dir "${link_dir}"
     "${setup_bin}" "$@"
