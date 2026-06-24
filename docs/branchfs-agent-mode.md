@@ -1,9 +1,13 @@
-# BranchFS Agent Mode for CCC
+# BranchFS design notes (agent containment)
 
-This document describes a future, non-production integration mode for running CCC
-agent and training containers on BranchFS-backed views of writable storage.
-It is a design note and operator guide, not a change to the current Ansible
-deployment or image startup behavior.
+This document records the BranchFS storage model and design rationale behind
+CCC's **agent containment** feature. The feature itself is implemented in the
+[`ccc-agent-containment`](https://github.com/vicoslab/ccc-agent-containment)
+runtime and wired into image startup (opt-in via `CCC_AGENT_CONTAINMENT_ENABLE`);
+see [`docs/agent-containment.md`](agent-containment.md) for the operational setup
+(enable flag, env vars, image bake, updating). This file is the "why" — the
+storage layout, the trust split, and the BranchFS properties the design relies
+on — plus notes on the distributed-training use of the same mechanism.
 
 ## Goals
 
@@ -18,78 +22,55 @@ deployment or image startup behavior.
 - Keep CCC's existing image model intact: the image root remains non-writable by
   the normal user, and only mutable data mounts are protected.
 
-## Intended CCC Storage Model
+## CCC storage model
 
-BranchFS should protect writable CCC data mounts, especially:
+BranchFS protects the writable CCC data under `/storage`. CCC exposes
+`/home/$USER` from the same user storage area that is also available under
+`/storage/user` (specifically `/storage/user/$CONTAINER_NAME`). These paths
+share **one** BranchFS root — `/home/$USER` and `/storage/user/...` must not be
+branched independently, or there would be two incoherent writable aliases for
+the same backing files.
 
-- `/storage/user`
-- `/home/$USER`, as a subpath of `/storage/user`
-- `/storage/group`, when the container has writable group storage
-- optional private or local scratch mounts when their artifacts must be reviewed
-
-`/storage/datasets` should normally remain read-only passthrough storage. Local
-scratch such as `/storage/local/ssd` or `/storage/local/hdd` can remain
-disposable unless a workflow needs its outputs reviewed and committed.
-
-CCC exposes `/home/$USER` from the same user storage area that is also available
-under `/storage/user`. These paths must share one BranchFS root. Do not branch
-`/home/$USER` and `/storage/user` independently, because that would create two
-incoherent writable aliases for the same backing files.
-
-Conceptually:
+The implemented layout (generated at container startup by `ccc-agent-setup`):
 
 ```text
-real underlay:
-  /__real/storage_user
-  /__real/storage_user/<home-subdir>
-
-branch view:
-  /__branchfs_mounts/storage_user
-
-agent-visible paths:
-  /storage/user -> /__branchfs_mounts/storage_user
-  /home/$USER   -> /__branchfs_mounts/storage_user/<home-subdir>
+real underlay (read-through):   /storage                     (base)
+node-local delta store:         /opt/branchfs_branches        (off /storage)
+branch mounted back inside box: /storage
+home is a subpath of the same branch:
+  /home/$USER  ==  /storage/user/$CONTAINER_NAME
 ```
 
-The `<home-subdir>` value must be the relative path inside `/storage/user` that
-backs `/home/$USER` for the current CCC deployment.
+So the whole of `/storage` is branched once; the branch is mounted back at
+`/storage` in the sandbox, and the branch's `user/$CONTAINER_NAME` subdir is
+bind-mounted to `/home/$USER`. `/storage/datasets` and `/storage/group` are
+read-through; writes to them are captured as branch deltas and flagged for
+review rather than touching the real NFS. The delta store and the runtime's
+`state_dir` live **off** `/storage` (node-local) so BranchFS never branches its
+own state.
 
-Prototype agent-side mount command:
+## Agent and trusted split (the security boundary)
 
-```bash
-branchfs mount \
-  --base /__real/storage_user \
-  --storage /__branchfs_store/storage_user \
-  --branch "$BRANCH_ID" \
-  --agent \
-  /__branchfs_mounts/storage_user
-```
+The agent runs inside a **rootless bubblewrap** user+mount+pid namespace — no
+container `CAP_SYS_ADMIN`, no privileged helper. Inside the sandbox the agent
+sees only:
 
-Then bind `/__branchfs_mounts/storage_user` to `/storage/user`, and bind
-`/__branchfs_mounts/storage_user/<home-subdir>` to `/home/$USER`.
+- the BranchFS branch (read-write) at `/storage` and `/home/$USER`;
+- read-through datasets;
+- **not** the real NFS underlay, the BranchFS store, or any commit-capable
+  control socket / `.branchfs_ctl`.
 
-## Agent and Trusted Container Split
+The trusted supervisor runs **outside** the sandbox and owns commit authority:
+real underlays, the BranchFS store, and the freeze/inspect/commit/abort API. The
+agent can create branch deltas but cannot commit them to real storage itself.
+(In the accepted threat model this is best-effort against accidental/naive
+misbehavior, not a defense against an agent that actively spoofs its own
+approval — see `ccc-agent-containment` docs.)
 
-The agent container must see only branch views:
+## Lazy branch behavior
 
-- BranchFS-mounted writable views for protected storage.
-- Read-only passthrough mounts for immutable datasets.
-- No real NFS underlay paths such as `/__real/storage_user`.
-- No BranchFS store paths or commit-capable control socket.
-- No `.branchfs_ctl` or equivalent interface that can freeze, abort, or commit.
-
-A separate trusted review/commit container or sidecar owns commit authority:
-
-- Real NFS underlays mounted read/write.
-- BranchFS store and control API access.
-- Permission to freeze, inspect, diff, commit, or abort branches.
-
-This split is the security boundary. Agent containers may create branch deltas,
-but they must not be able to commit those deltas to real storage themselves.
-
-## Lazy Branch Behavior
-
-The intended BranchFS behavior for CCC is lazy inheritance:
+BranchFS uses lazy inheritance, which is what makes branching all of `/storage`
+viable:
 
 - Creating a branch writes metadata and empty delta/tombstone directories only.
 - Reading an inherited path resolves through the parent branch or base underlay.
@@ -99,13 +80,12 @@ The intended BranchFS behavior for CCC is lazy inheritance:
   tombstones without scanning unrelated parts of the tree.
 - Status and diff walk branch deltas and tombstones, not the full underlay.
 
-This matters because CCC user and group areas can contain very large trees.
 Branch creation must be O(1) with respect to the number of inherited files.
 
-## Distributed Training Semantics
+## Distributed training semantics
 
-Relaxed multi-writer mode is intended for training jobs where multiple nodes or
-ranks write disjoint files into the same branch. Suitable output layouts include:
+Relaxed multi-writer mode supports training jobs where multiple nodes or ranks
+write disjoint files into the same branch. Suitable output layouts:
 
 ```text
 /storage/user/experiments/<run-id>/
@@ -116,12 +96,12 @@ ranks write disjoint files into the same branch. Suitable output layouts include
   checkpoints/step-000100/rank-00001.pt
 ```
 
-Supported convention:
+Supported:
 
-- Multiple nodes can create and write distinct files in one branch.
-- Concurrent `mkdir -p` of the same directory should be tolerated.
-- Branch deltas live in a shared store, so other nodes using the same branch can
-  read files after they become visible through normal filesystem behavior.
+- Multiple nodes create and write distinct files in one branch.
+- Concurrent `mkdir -p` of the same directory is tolerated.
+- Branch deltas live in a shared store, so other nodes on the same branch can
+  read files once they become visible through normal filesystem behavior.
 
 Explicitly unsupported in relaxed mode:
 
@@ -129,79 +109,53 @@ Explicitly unsupported in relaxed mode:
 - Delete-vs-write races on the same path.
 - Overlapping renames.
 - Treating files such as `latest.pt`, `shared.log`, or one shared metrics file
-  as safe multi-writer targets unless the training framework provides its own
+  as safe multi-writer targets unless the framework provides its own
   synchronization.
 
 Jobs should write rank-local artifacts and use manifests or post-processing to
-identify the chosen checkpoint. Same-path multi-writer races are outside the
-guarantees of this mode.
+identify the chosen checkpoint. Large checkpoints should be written directly to
+their final per-rank path, or to a temporary path followed by a coordinated
+single-writer rename.
 
-## Freeze, Review, and Commit Flow
+## Freeze, review, and commit flow
 
-The expected lifecycle is:
+1. The trusted launcher (`ccc-agent-run` / the shim) creates a BranchFS branch.
+2. The agent runs with only branch views mounted.
+3. At each turn's Stop boundary (and at session end) the supervisor classifies
+   the branch deltas against the path policy.
+4. In-scope changes (under the home/workspace) are committed; out-of-scope ones
+   are reported for review via `ccc-agentctl` (accept / reject / file- or
+   line-level), and the branch is otherwise left for later inspection.
 
-1. A trusted launcher creates or selects a BranchFS branch.
-2. Agent and training containers run with only branch views mounted.
-3. The trusted sidecar freezes the branch when the run is complete or ready for
-   review.
-4. Review tools inspect branch status, diffs, manifests, logs, and artifacts.
-5. A trusted operator or policy commits approved changes, or aborts/discards the
-   branch.
-
-Prototype trusted-side commands:
+Commit is **selective** — only reviewed, in-scope deltas are applied to the
+base; the runtime does not blindly `commit-branch` the whole branch. The
+low-level BranchFS store interface (used by the supervisor, never the agent):
 
 ```bash
-branchfs freeze "$BRANCH_ID" --storage /__branchfs_store/storage_user
-branchfs status "$BRANCH_ID" --storage /__branchfs_store/storage_user
-branchfs commit-branch "$BRANCH_ID" --storage /__branchfs_store/storage_user
-# or discard:
-branchfs abort-branch "$BRANCH_ID" --storage /__branchfs_store/storage_user
+branchfs status      "$BRANCH_ID" --storage /opt/branchfs_branches/storage --json
+branchfs commit-branch "$BRANCH_ID" --storage /opt/branchfs_branches/storage
+branchfs abort-branch  "$BRANCH_ID" --storage /opt/branchfs_branches/storage
 ```
 
-These commands use the current BranchFS prototype CLI. The required property is
-the boundary: freeze/review/commit operations run only from the trusted
-environment, never from the agent container.
+## Deployment
 
-## Deployment Considerations
+FUSE and the sandbox both run **unprivileged**: BranchFS mounts via the
+[`ccc-fuse-sidecar`](https://github.com/vicoslab/ccc-fuse-sidecar) (see
+[`docs/fuse-support.md`](fuse-support.md)) and the agent is confined with
+rootless bwrap — no `--privileged`, no `CAP_SYS_ADMIN`. The container must allow
+**unprivileged user namespaces** for bwrap. Real underlays, the BranchFS store,
+and control APIs are hidden from the agent before it starts (the sandbox exposes
+only the branch view). See `docs/agent-containment.md` for the concrete env vars
+and `/proc` note.
 
-BranchFS uses FUSE, so a CCC deployment will need a privileged startup path or
-sidecar that can perform mounts. Depending on Docker and host policy, this may
-require:
+## Remaining limitations and future work
 
-- `/dev/fuse` passed into the mounting context.
-- `CAP_SYS_ADMIN` or equivalent mount capability.
-- A privileged sidecar or early container startup phase to mount BranchFS views.
-- Bind mounts from BranchFS views onto the normal CCC paths.
-- Careful hiding of real underlays, BranchFS stores, and control APIs before the
-  untrusted agent process starts.
-
-These are deployment concerns for future CCC integration. This repository change
-does not wire BranchFS into Ansible, runit startup scripts, or production image
-behavior.
-
-## Performance Constraints
-
-The integration is only viable if the implementation preserves these properties:
-
-- Branch creation is O(1).
-- New artifact writes do not scan the base tree.
-- First copy-on-write of an inherited file copies only that file.
-- Directory listing scans only the listed directory in the base/parent and delta.
-- Status and diff operate from delta and tombstone metadata.
-- Multi-node jobs avoid hot shared output files.
-
-Large model checkpoints should be written directly to their final per-rank path
-or to a temporary path followed by a coordinated single-writer rename.
-
-## Limitations and Future Work
-
-- This document describes a future mode and example scaffolding only.
-- Agent-visible BranchFS mounts must use `branchfs mount --agent` or
-  `--no-control` so commit-capable controls are not exposed in the mounted tree.
-- Shared NFS branch stores need robust metadata persistence and cache visibility
-  semantics across nodes.
+- Shared NFS branch stores need robust metadata persistence and cross-node cache
+  visibility semantics; the default store is node-local.
 - Commit across multiple independent NFS exports cannot be globally atomic.
 - Strong same-path concurrency would require per-path locking or a stricter
   coordination layer.
-- Operational policy is still needed for branch naming, retention, quotas,
+- Operational policy is still evolving for branch naming, retention, quotas,
   review approval, and cleanup.
+- Agent-visible BranchFS mounts use `branchfs mount --agent` so commit-capable
+  controls are not exposed in the mounted tree.

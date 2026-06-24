@@ -4,16 +4,6 @@ Conda Compute Containers
 Contains build files for containers that use Conda in users directory (mounted as a persistent volume) for further package installation. The image itself is not writeable by the user.
 Images also contain basic labels that are used to configure FRP port proxying.
 
-BranchFS agent/training mode
-----------------------------
-
-Design notes for BranchFS-backed agent and training containers (protecting
-writable CCC data mounts by exposing branch views while keeping the real NFS
-underlays and commit controls in a trusted sidecar) live in
-[`docs/branchfs-agent-mode.md`](docs/branchfs-agent-mode.md), with a dry-run
-wrapper sketch at `scripts/branchfs-agent-mode.example.sh`. These are
-non-production scaffolding and do not change deployment or image startup.
-
 Manual development image builds
 -------------------------------
 
@@ -89,8 +79,11 @@ repo, is **off by default**, and is enabled per container with:
 -e CCC_AGENT_CONTAINMENT_ENABLE=1
 ```
 
-See [`docs/agent-containment.md`](docs/agent-containment.md) for the full setup:
-storage/path wiring, env vars, baking it into the image, and updating.
+See [`docs/agent-containment.md`](docs/agent-containment.md) for the full setup
+(storage/path wiring, env vars, baking it into the image, updating) and
+[`docs/branchfs-agent-mode.md`](docs/branchfs-agent-mode.md) for the underlying
+BranchFS design rationale and the distributed-training use of the same branch
+mechanism.
 
 VS Code
 -------

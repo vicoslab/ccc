@@ -137,5 +137,6 @@ default `bwrap_proc_mode: bind` works without that.
 Commit/review policy lives entirely in the external runtime; CCC image startup
 only performs opt-in installation/wiring. See the `ccc-agent-containment` repo's
 `docs/agent-integration.md` for hook registration and credential details, and
-`docs/branchfs-agent-mode.md` here for the original BranchFS agent/training-mode
-design notes.
+[`branchfs-agent-mode.md`](branchfs-agent-mode.md) for the BranchFS design
+rationale behind this feature (storage model, trust split, lazy inheritance) and
+the distributed-training use of the same branch mechanism.
