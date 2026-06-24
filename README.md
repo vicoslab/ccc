@@ -186,7 +186,9 @@ docker build base/ \
 
 This runs `/etc/setup_ccc_agents.sh --install-only` at build time (bwrap +
 branchfs binary + the pip package; user-specific config/hooks are still wired at
-startup). It is **off by default** to keep base images lean. The build-arg ref
+startup). It is **on by default** (`PREINSTALL=1`); build with
+`--build-arg CCC_AGENT_CONTAINMENT_PREINSTALL=0` to skip it and keep the base
+image lean (the runtime then installs on first boot instead). The build-arg ref
 defaults match the runtime defaults, so a stock baked image is a no-op at boot.
 
 ### Updating
