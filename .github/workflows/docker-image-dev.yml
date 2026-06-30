@@ -143,7 +143,7 @@ jobs:
           docker build --pull -t "${IMAGE_REF}" \
             --build-arg "ROOT_IMAGE=${ROOT_IMAGE}" \
             --build-arg "CCC_FUSE_CLIENT_IMAGE=${FUSE_SIDECAR_CLIENT_IMAGE}" \
-            --build-arg "CCC_AGENT_CONTAINMENT_BRANCHFS_REF=feat/ccc-agent-containment" \
+            --build-arg "CCC_AGENT_BRANCHFS_REF=feat/ccc-agent-containment" \
             "${EXTRA_BUILD_ARGS[@]}" \
             "${CONTEXT}"
           echo "::endgroup::"

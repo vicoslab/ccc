@@ -48,22 +48,22 @@ RUN set -eux; \
         ln -sfn /opt/ccc-fuse-sidecar/bin/fusermount3 "$dir/fusemount"; \
     done
 
-# Bake the ccc-agent-containment runtime into the image so an enabled container
-# starts instantly instead of building rust/branchfs on first boot.  
-# Use --build-arg CCC_AGENT_CONTAINMENT_PREINSTALL=0 to disable install.
-ARG CCC_AGENT_CONTAINMENT_PREINSTALL=1
-ARG CCC_AGENT_CONTAINMENT_REF=master
-ARG CCC_AGENT_CONTAINMENT_BRANCHFS_REF=master
+# Bake the ccc-agent runtime into the image so an enabled container starts
+# instantly instead of building rust/branchfs on first boot.
+# Use --build-arg CCC_AGENT_PREINSTALL=0 to disable install.
+ARG CCC_AGENT_PREINSTALL=1
+ARG CCC_AGENT_REF=master
+ARG CCC_AGENT_BRANCHFS_REF=master
 RUN set -eux; \
-    case "${CCC_AGENT_CONTAINMENT_PREINSTALL}" in \
+    case "${CCC_AGENT_PREINSTALL}" in \
         1|true|TRUE|yes|YES|on|ON) \
-            CCC_AGENT_CONTAINMENT_REF="${CCC_AGENT_CONTAINMENT_REF}" \
-            CCC_AGENT_CONTAINMENT_BRANCHFS_REF="${CCC_AGENT_CONTAINMENT_BRANCHFS_REF}" \
-                sh /etc/setup_ccc_agents.sh --install-only; \
+            CCC_AGENT_REF="${CCC_AGENT_REF}" \
+            CCC_AGENT_BRANCHFS_REF="${CCC_AGENT_BRANCHFS_REF}" \
+                sh /etc/setup_ccc_agent.sh --install-only; \
             apt-get clean; \
             rm -rf /var/lib/apt/lists/*; \
             ;; \
-        *) echo "ccc-agent-containment: PREINSTALL off; runtime install at first boot"; ;; \
+        *) echo "ccc-agent: PREINSTALL off; runtime install at first boot"; ;; \
     esac
 
 EXPOSE 22

@@ -72,11 +72,11 @@ CCC can run coding agents (Codex / Claude Code / Hermes / OpenCode) confined to
 a BranchFS branch view, so they work against CCC storage without direct write
 access to the real NFS data; a trusted supervisor commits only after a path
 policy passes. It lives in the separate
-[`ccc-agent-containment`](https://github.com/vicoslab/ccc-agent-containment)
+[`ccc-agent`](https://github.com/vicoslab/ccc-agent)
 repo, is **off by default**, and is enabled per container with:
 
 ```bash
--e CCC_AGENT_CONTAINMENT_ENABLE=1
+-e CCC_AGENT_ENABLE=1
 ```
 
 See [`docs/agent-containment.md`](docs/agent-containment.md) for the full setup:

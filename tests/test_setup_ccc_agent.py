@@ -1,4 +1,4 @@
-"""Tests for the CCC image ccc-agent-containment setup wrapper."""
+"""Tests for the CCC image ccc-agent setup wrapper."""
 
 import os
 import subprocess
@@ -7,7 +7,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CCC_DIR = os.path.dirname(HERE)
-SETUP_SH = os.path.join(CCC_DIR, "base", "etc", "setup_ccc_agents.sh")
+SETUP_SH = os.path.join(CCC_DIR, "base", "etc", "setup_ccc_agent.sh")
 
 
 class TestSetupCccAgents(unittest.TestCase):
@@ -20,10 +20,10 @@ class TestSetupCccAgents(unittest.TestCase):
         self._write_executable("branchfs", "#!/bin/sh\nexit 0\n")
         self._write_executable("bwrap", "#!/bin/sh\nexit 0\n")
         self._write_executable(
-            "ccc-agent-setup",
+            "ccc-agent",
             "#!/bin/sh\n"
-            "if [ \"${1:-}\" = --help ]; then\n"
-            "  echo 'usage: ccc-agent-setup --storage-root --conda-activate-shims'\n"
+            "if [ \"${1:-}\" = setup ] && [ \"${2:-}\" = --help ]; then\n"
+            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims'\n"
             "  exit 0\n"
             "fi\n"
             "printf '%s\n' \"$@\" > \"$CCC_AGENT_TEST_ARGS_FILE\"\n"
@@ -44,10 +44,10 @@ class TestSetupCccAgents(unittest.TestCase):
         env = {
             "PATH": "%s:/usr/bin:/bin" % self.bin,
             "CCC_AGENT_TEST_ARGS_FILE": self.args_file,
-            "CCC_AGENT_CONTAINMENT_INSTALL_DIR": os.path.join(self.tmp, "install"),
+            "CCC_AGENT_INSTALL_DIR": os.path.join(self.tmp, "install"),
             "CCC_AGENT_CONFIG": os.path.join(self.tmp, "config.json"),
-            "CCC_AGENT_CONTAINMENT_ENABLE_SHIMS": "1",
-            "CCC_AGENT_CONTAINMENT_LINK_DIR": os.path.join(self.tmp, "shims"),
+            "CCC_AGENT_ENABLE_SHIMS": "1",
+            "CCC_AGENT_LINK_DIR": os.path.join(self.tmp, "shims"),
             "USER_NAME": "cccagenttest",
             "CONTAINER_NAME": "domen-cuda10",
         }
@@ -68,8 +68,8 @@ class TestSetupCccAgents(unittest.TestCase):
     def test_wire_passes_conda_shim_activation_flags_when_enabled(self):
         conda_prefix = os.path.join(self.tmp, "conda-env")
         proc = self.run_setup({
-            "CCC_AGENT_CONTAINMENT_CONDA_ACTIVATE_SHIMS": "1",
-            "CCC_AGENT_CONTAINMENT_CONDA_PREFIX": conda_prefix,
+            "CCC_AGENT_CONDA_ACTIVATE_SHIMS": "1",
+            "CCC_AGENT_CONDA_PREFIX": conda_prefix,
         })
         self.assertEqual(proc.returncode, 0, proc.stderr)
         args = self.setup_args()
