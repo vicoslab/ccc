@@ -198,9 +198,28 @@ syspy() {
     printf '%s' "${p}"
 }
 
+preferred_ccc_agent() {
+    # Prefer the system-installed console script over whatever a user or conda
+    # environment put first on PATH.  Startup wiring uses this binary to install
+    # shims/plugins, so resolving ~/.local/bin/ccc-agent here can keep linking
+    # stale package assets even after a system update was requested.
+    for candidate in \
+        "${CCC_AGENT_SETUP_BIN:-}" \
+        "${link_dir}/ccc-agent" \
+        /usr/local/bin/ccc-agent \
+        /usr/bin/ccc-agent
+    do
+        [ -n "${candidate}" ] || continue
+        [ -x "${candidate}" ] || continue
+        printf '%s' "${candidate}"
+        return 0
+    done
+    return 1
+}
+
 pip_up_to_date() {
     truthy "${update_pip}" && return 1
-    command -v ccc-agent >/dev/null 2>&1 || return 1
+    preferred_ccc_agent >/dev/null 2>&1 || return 1
     [ "$(cat "${pip_marker}" 2>/dev/null || true)" = "${ref}" ]
 }
 
@@ -222,9 +241,17 @@ ensure_pip_package() {
 
     pip_spec="git+${repo}@${ref}"
     echo "ccc-agent: pip-installing ${pip_spec} into ${sp}"
-    if ! "${sp}" -m pip install --break-system-packages --upgrade "${pip_spec}" 2>/dev/null; then
+    force_args=""
+    if truthy "${update_pip}"; then
+        # ccc-agent's package version may intentionally stay stable while the
+        # requested branch advances.  `pip install --upgrade git+...@master` is
+        # not enough to guarantee same-version files/scripts are replaced, so a
+        # forced runtime update must bypass the cache and reinstall the package.
+        force_args="--force-reinstall --no-cache-dir"
+    fi
+    if ! "${sp}" -m pip install --break-system-packages --upgrade ${force_args} "${pip_spec}" 2>/dev/null; then
         # older pip (no --break-system-packages) or non-PEP668 env
-        "${sp}" -m pip install --upgrade "${pip_spec}" \
+        "${sp}" -m pip install --upgrade ${force_args} "${pip_spec}" \
             || { echo "ccc-agent: ERROR: pip install of ${pip_spec} failed" >&2; return 1; }
     fi
     printf '%s\n' "${ref}" > "${pip_marker}"
@@ -248,11 +275,9 @@ run_wire() {
     branchfs_resolved="${branchfs_bin:-$(command -v branchfs 2>/dev/null || echo "${branchfs_dest}")}"
     bwrap_resolved="${CCC_AGENT_BWRAP_BIN:-$(command -v bwrap 2>/dev/null || echo bwrap)}"
 
-    setup_bin="$(command -v ccc-agent 2>/dev/null || true)"
+    setup_bin="$(preferred_ccc_agent 2>/dev/null || true)"
     if [ -z "${setup_bin}" ]; then
-        for d in /usr/local/bin /usr/bin; do
-            [ -x "${d}/ccc-agent" ] && { setup_bin="${d}/ccc-agent"; break; }
-        done
+        setup_bin="$(command -v ccc-agent 2>/dev/null || true)"
     fi
     [ -n "${setup_bin}" ] || { echo "ccc-agent: ERROR: ccc-agent not found (run the install phase first)" >&2; return 1; }
 

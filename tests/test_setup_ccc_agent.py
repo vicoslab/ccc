@@ -17,8 +17,12 @@ class TestSetupCccAgents(unittest.TestCase):
         self.bin = os.path.join(self.tmp, "bin")
         os.makedirs(self.bin)
         self.args_file = os.path.join(self.tmp, "setup-args.txt")
+        self.pip_args_file = os.path.join(self.tmp, "pip-args.txt")
+        self.install_dir = os.path.join(self.tmp, "install")
+        self.link_dir = os.path.join(self.tmp, "shims")
         self._write_executable("branchfs", "#!/bin/sh\nexit 0\n")
         self._write_executable("bwrap", "#!/bin/sh\nexit 0\n")
+        self._write_executable("git", "#!/bin/sh\nexit 0\n")
         self._write_executable(
             "ccc-agent",
             "#!/bin/sh\n"
@@ -35,23 +39,40 @@ class TestSetupCccAgents(unittest.TestCase):
 
     def _write_executable(self, name, content):
         path = os.path.join(self.bin, name)
+        return self._write_executable_at(path, content)
+
+    def _write_executable_at(self, path, content):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as fh:
             fh.write(content)
         os.chmod(path, 0o755)
         return path
 
-    def run_setup(self, extra_env=None):
+    def _write_fake_system_python(self):
+        return self._write_executable_at(
+            os.path.join(self.tmp, "system-python3"),
+            "#!/bin/sh\n"
+            "printf '%s\\n' \"$*\" >> \"$CCC_AGENT_TEST_PIP_ARGS_FILE\"\n"
+            "exit 0\n",
+        )
+
+    def base_env(self, extra_env=None):
         env = {
             "PATH": "%s:/usr/bin:/bin" % self.bin,
             "CCC_AGENT_TEST_ARGS_FILE": self.args_file,
-            "CCC_AGENT_INSTALL_DIR": os.path.join(self.tmp, "install"),
+            "CCC_AGENT_TEST_PIP_ARGS_FILE": self.pip_args_file,
+            "CCC_AGENT_INSTALL_DIR": self.install_dir,
             "CCC_AGENT_CONFIG": os.path.join(self.tmp, "config.json"),
             "CCC_AGENT_ENABLE_SHIMS": "1",
-            "CCC_AGENT_LINK_DIR": os.path.join(self.tmp, "shims"),
+            "CCC_AGENT_LINK_DIR": self.link_dir,
             "USER_NAME": "cccagenttest",
             "CONTAINER_NAME": "domen-cuda10",
         }
         env.update(extra_env or {})
+        return env
+
+    def run_setup(self, extra_env=None):
+        env = self.base_env(extra_env)
         proc = subprocess.run(
             ["sh", SETUP_SH, "--wire-only"],
             env=env,
@@ -61,8 +82,28 @@ class TestSetupCccAgents(unittest.TestCase):
         )
         return proc
 
+    def run_install(self, extra_env=None):
+        env = self.base_env({
+            "CCC_AGENT_INSTALL_DEPS": "0",
+            "CCC_AGENT_SYSTEM_PYTHON": self._write_fake_system_python(),
+            "CCC_AGENT_BRANCHFS_BIN": os.path.join(self.bin, "branchfs"),
+        })
+        env.update(extra_env or {})
+        proc = subprocess.run(
+            ["sh", SETUP_SH, "--install-only"],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return proc
+
     def setup_args(self):
         with open(self.args_file) as fh:
+            return fh.read().splitlines()
+
+    def pip_invocations(self):
+        with open(self.pip_args_file) as fh:
             return fh.read().splitlines()
 
     def test_wire_passes_conda_shim_activation_flags_when_enabled(self):
@@ -85,6 +126,49 @@ class TestSetupCccAgents(unittest.TestCase):
         self.assertIn("--enable-shims", args)
         self.assertNotIn("--conda-activate-shims", args)
         self.assertNotIn("--conda-prefix", args)
+
+    def test_install_does_not_treat_user_path_ccc_agent_as_system_install(self):
+        os.makedirs(self.install_dir, exist_ok=True)
+        with open(os.path.join(self.install_dir, ".ccc-agent-ref"), "w") as fh:
+            fh.write("master\n")
+
+        proc = self.run_install()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        invocations = self.pip_invocations()
+        self.assertTrue(any(" pip install " in " %s " % line
+                            for line in invocations), invocations)
+
+    def test_forced_update_reinstalls_same_version_package_without_cache(self):
+        proc = self.run_install({"CCC_AGENT_UPDATE": "1"})
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        install_lines = [line for line in self.pip_invocations()
+                         if " pip install " in " %s " % line]
+        self.assertTrue(install_lines, self.pip_invocations())
+        install_line = install_lines[-1]
+        self.assertIn("--force-reinstall", install_line)
+        self.assertIn("--no-cache-dir", install_line)
+
+    def test_wire_prefers_system_entrypoint_for_latest_shims(self):
+        system_args_file = os.path.join(self.tmp, "system-setup-args.txt")
+        self._write_executable_at(
+            os.path.join(self.link_dir, "ccc-agent"),
+            "#!/bin/sh\n"
+            "if [ \"${1:-}\" = setup ] && [ \"${2:-}\" = --help ]; then\n"
+            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims'\n"
+            "  exit 0\n"
+            "fi\n"
+            "printf '%s\\n' \"$@\" > \"$CCC_AGENT_TEST_SYSTEM_ARGS_FILE\"\n"
+            "exit 0\n",
+        )
+
+        proc = self.run_setup({"CCC_AGENT_TEST_SYSTEM_ARGS_FILE": system_args_file})
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(os.path.exists(system_args_file), proc.stderr)
+        self.assertFalse(os.path.exists(self.args_file),
+                         "PATH user ccc-agent was used instead of system entrypoint")
 
 
 if __name__ == "__main__":
