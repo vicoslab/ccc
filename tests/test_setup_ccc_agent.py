@@ -8,6 +8,8 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 CCC_DIR = os.path.dirname(HERE)
 SETUP_SH = os.path.join(CCC_DIR, "base", "etc", "setup_ccc_agent.sh")
+SSHD_CONFIG_SH = os.path.join(
+    CCC_DIR, "base", "etc", "runit_init.d", "01_sshd_config.sh")
 
 
 class TestSetupCccAgents(unittest.TestCase):
@@ -19,7 +21,12 @@ class TestSetupCccAgents(unittest.TestCase):
         self.args_file = os.path.join(self.tmp, "setup-args.txt")
         self.pip_args_file = os.path.join(self.tmp, "pip-args.txt")
         self.install_dir = os.path.join(self.tmp, "install")
-        self.link_dir = os.path.join(self.tmp, "shims")
+        self.link_dir = os.path.join(self.install_dir, "shims")
+        self.config_dir = os.path.join(self.tmp, "etc", "ccc-agent")
+        self.base = os.path.join(self.tmp, "home-base")
+        self.user_home = os.path.join(self.base, "cccagenttest")
+        os.makedirs(self.user_home)
+        self.shell_hook = os.path.join(self.config_dir, "shim-path.sh")
         self._write_executable("branchfs", "#!/bin/sh\nexit 0\n")
         self._write_executable("bwrap", "#!/bin/sh\nexit 0\n")
         self._write_executable("git", "#!/bin/sh\nexit 0\n")
@@ -27,7 +34,7 @@ class TestSetupCccAgents(unittest.TestCase):
             "ccc-agent",
             "#!/bin/sh\n"
             "if [ \"${1:-}\" = setup ] && [ \"${2:-}\" = --help ]; then\n"
-            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims'\n"
+            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims --shell-path-hook'\n"
             "  exit 0\n"
             "fi\n"
             "printf '%s\n' \"$@\" > \"$CCC_AGENT_TEST_ARGS_FILE\"\n"
@@ -62,11 +69,12 @@ class TestSetupCccAgents(unittest.TestCase):
             "CCC_AGENT_TEST_ARGS_FILE": self.args_file,
             "CCC_AGENT_TEST_PIP_ARGS_FILE": self.pip_args_file,
             "CCC_AGENT_INSTALL_DIR": self.install_dir,
-            "CCC_AGENT_CONFIG": os.path.join(self.tmp, "config.json"),
+            "CCC_AGENT_CONFIG_DIR": self.config_dir,
+            "CCC_AGENT_CONFIG": os.path.join(self.config_dir, "config.json"),
             "CCC_AGENT_ENABLE_SHIMS": "1",
-            "CCC_AGENT_LINK_DIR": self.link_dir,
             "USER_NAME": "cccagenttest",
             "CONTAINER_NAME": "domen-cuda10",
+            "BASE": self.base,
         }
         env.update(extra_env or {})
         return env
@@ -116,8 +124,36 @@ class TestSetupCccAgents(unittest.TestCase):
         args = self.setup_args()
         self.assertIn("--enable-shims", args)
         self.assertIn("--link-dir", args)
+        self.assertEqual(args[args.index("--link-dir") + 1], self.link_dir)
+        self.assertIn("--shell-path-hook", args)
+        self.assertEqual(args[args.index("--shell-path-hook") + 1],
+                         self.shell_hook)
         self.assertIn("--conda-activate-shims", args)
         self.assertEqual(args[args.index("--conda-prefix") + 1], conda_prefix)
+
+    def test_wire_installs_user_shell_startup_block_when_shims_enabled(self):
+        proc = self.run_setup()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        block_start = "# BEGIN ccc-agent shims"
+        for name in (".bashrc", ".profile"):
+            path = os.path.join(self.user_home, name)
+            self.assertTrue(os.path.isfile(path), path)
+            with open(path) as fh:
+                body = fh.read()
+            self.assertIn(block_start, body)
+            self.assertIn(self.shell_hook, body)
+        self.assertIn("--shell-path-hook", self.setup_args())
+
+    def test_wire_skips_shim_path_wiring_when_shims_disabled(self):
+        proc = self.run_setup({"CCC_AGENT_ENABLE_SHIMS": "0"})
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        args = self.setup_args()
+        self.assertNotIn("--enable-shims", args)
+        self.assertNotIn("--shell-path-hook", args)
+        for name in (".bashrc", ".profile"):
+            self.assertFalse(os.path.exists(os.path.join(self.user_home, name)))
 
     def test_wire_omits_conda_flags_by_default(self):
         proc = self.run_setup()
@@ -189,7 +225,7 @@ class TestSetupCccAgents(unittest.TestCase):
             os.path.join(self.link_dir, "ccc-agent"),
             "#!/bin/sh\n"
             "if [ \"${1:-}\" = setup ] && [ \"${2:-}\" = --help ]; then\n"
-            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims'\n"
+            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims --shell-path-hook'\n"
             "  exit 0\n"
             "fi\n"
             "printf '%s\\n' \"$@\" > \"$CCC_AGENT_TEST_SYSTEM_ARGS_FILE\"\n"
@@ -202,6 +238,58 @@ class TestSetupCccAgents(unittest.TestCase):
         self.assertTrue(os.path.exists(system_args_file), proc.stderr)
         self.assertFalse(os.path.exists(self.args_file),
                          "PATH user ccc-agent was used instead of system entrypoint")
+
+
+class TestSshdConfigCccAgentShims(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = self._tmp.name
+        self.config = os.path.join(self.tmp, "sshd_config")
+        self.install_dir = os.path.join(self.tmp, "install")
+        self.base = os.path.join(self.tmp, "home-base")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def run_config(self, enabled):
+        env = {
+            "PATH": "/usr/bin:/bin",
+            "CCC_SSHD_CONFIG": self.config,
+            "CCC_AGENT_ENABLE_SHIMS": "1" if enabled else "0",
+            "CCC_AGENT_INSTALL_DIR": self.install_dir,
+            "BASE": self.base,
+            "USER_NAME": "cccagenttest",
+            "CONTAINER_NAME": "domen-cuda10",
+        }
+        return subprocess.run(
+            ["bash", SSHD_CONFIG_SH],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+    def read_config(self):
+        with open(self.config) as fh:
+            return fh.read()
+
+    def test_sshd_setenv_path_prepends_dedicated_shim_dir_when_enabled(self):
+        proc = self.run_config(enabled=True)
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        body = self.read_config()
+        expected_home = os.path.join(self.base, "cccagenttest")
+        expected_shims = os.path.join(self.install_dir, "shims")
+        self.assertIn("SetEnv PATH=%s:%s/.local/bin" %
+                      (expected_shims, expected_home), body)
+        self.assertIn("%s/conda/bin" % expected_home, body)
+        self.assertIn("%s/conda/condabin" % expected_home, body)
+
+    def test_sshd_setenv_path_is_absent_when_shims_disabled(self):
+        proc = self.run_config(enabled=False)
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertNotIn("SetEnv PATH=", self.read_config())
 
 
 if __name__ == "__main__":
