@@ -17,11 +17,11 @@ fi
 # All real work lives in the shared installer so the exact same code runs at
 # image build time (base/Dockerfile, `--install-only`) and here at startup.
 #
-# If the image was built with CCC_AGENT_PREINSTALL=1, the heavy bits
-# (bwrap + branchfs + the pip package) are already baked in and the install
-# phase is a fast no-op; it only rebuilds/re-pips when a NEWER ref is requested
-# via env (CCC_AGENT_REF / CCC_AGENT_BRANCHFS_REF, or *_UPDATE=1). The wire
-# phase (config + hooks, which need USER_NAME) always runs here.
+# If the image was built with CCC_AGENT_PREINSTALL=1, the user-independent bits
+# (bwrap + libfuse + ccc-agent[branchfs]) are already baked in and the install
+# phase is a fast no-op; it only re-pips when a NEWER ccc-agent ref is requested
+# via env (CCC_AGENT_REF or *_UPDATE=1). The wire phase (config + hooks, which
+# need USER_NAME) always runs here.
 setup="/etc/setup_ccc_agent.sh"
 if [ ! -f "${setup}" ]; then
     echo "ccc-agent: ERROR: ${setup} missing from image" >&2

@@ -20,7 +20,7 @@ invoked from two places: the **image build** (to bake the runtime in — see
 [Baking it into the image](#baking-it-into-the-image)) and **runit startup**
 (`etc/runit_init.d/06_ccc_agent.sh`, behind the enable flag). The
 startup call installs at first boot if nothing is baked in, and otherwise is a
-fast no-op that only rebuilds/re-pips when a **newer ref** is requested via env
+fast no-op that only re-pips when a **newer ccc-agent ref** is requested via env
 (see [Updating](#updating)).
 
 ## Optional variables
@@ -36,12 +36,10 @@ CCC_AGENT_CONDA_ACTIVATE_SHIMS=    # default = ENABLE_SHIMS; installs conda acti
 CCC_AGENT_CONDA_PREFIX=            # default: $CONDA_PREFIX, then /home/$USER/conda, /home/$USER/miniconda3, /opt/conda
 CCC_AGENT_REGISTER_PLUGINS=  # default = ENABLE_SHIMS; 1 to register native plugins
 CCC_AGENT_REGISTER_HOOKS=    # legacy alias for REGISTER_PLUGINS
-# Dependency install (bwrap + branchfs) into system dirs:
-CCC_AGENT_INSTALL_DEPS=1     # 0 to skip apt/cargo installs
-CCC_AGENT_BRANCHFS_REPO=https://github.com/vicoslab/branchfs.git
-CCC_AGENT_BRANCHFS_REF=master
-CCC_AGENT_BRANCHFS_DEST=/usr/local/bin/branchfs
-CCC_AGENT_BRANCHFS_BIN=     # prebuilt branchfs; set to skip the build
+# Dependency install (bwrap + libfuse + ccc-agent[branchfs]) into system dirs:
+CCC_AGENT_INSTALL_DEPS=1     # 0 to skip apt installs for bwrap/libfuse/python3-pip
+CCC_AGENT_INSTALL_BRANCHFS_EXTRA=1  # 1 = pip install ccc-agent[branchfs] release wheel
+CCC_AGENT_BRANCHFS_BIN=     # explicit operator-provided branchfs binary override
 CCC_AGENT_BWRAP_BIN=        # prebuilt bwrap; set to skip apt install
 CCC_AGENT_CONFIG=/etc/ccc-agent/config.json
 # Storage/path wiring (resolved at startup; see "How the storage is wired"):
@@ -77,49 +75,54 @@ branches its own state.
 
 ## Baking it into the image
 
-Building rust + branchfs on first boot takes minutes. Build the **base** image
-with the runtime baked in so an enabled container starts instantly (derived
-images — VS Code, Jupyter, … — inherit it from the base):
+Baking the runtime into the **base** image means an enabled container starts
+instantly (derived images — VS Code, Jupyter, … — inherit it from the base). The
+build now installs BranchFS through the `ccc-agent[branchfs]` pip extra, which
+downloads the vicoslab GitHub-release wheel; it does **not** install Rust/Cargo
+or build BranchFS from source.
 
 ```bash
 docker build base/ \
   --build-arg CCC_AGENT_PREINSTALL=1 \
-  --build-arg CCC_AGENT_REF=master \
-  --build-arg CCC_AGENT_BRANCHFS_REF=master
+  --build-arg CCC_AGENT_REF=master
 ```
 
 This runs `/etc/setup_ccc_agent.sh --install-only` at build time (bwrap +
-branchfs binary + the pip package; user-specific config/hooks are still wired at
-startup). It is **on by default** (`PREINSTALL=1`); build with
-`--build-arg CCC_AGENT_PREINSTALL=0` to skip it and keep the base
-image lean (the runtime then installs on first boot instead). The build-arg ref
-defaults match the runtime defaults, so a stock baked image is a no-op at boot.
+libfuse runtime + the `ccc-agent[branchfs]` pip package; user-specific
+config/hooks are still wired at startup). It is **on by default**
+(`PREINSTALL=1`); build with `--build-arg CCC_AGENT_PREINSTALL=0` to skip it and
+keep the base image lean (the runtime then installs on first boot instead). The
+build-arg ref defaults match the runtime defaults, so a stock baked image is a
+no-op at boot.
 
 ## Updating
 
-A baked-in image is pinned to the refs it was built with (recorded in markers
-under `/opt/ccc-agent`). To pull a newer version at container start, request a
-different ref — only the changed component is rebuilt/re-pipped:
+A baked-in image is pinned to the ccc-agent ref it was built with (recorded in a
+marker under `/opt/ccc-agent`). To pull a newer version at container start,
+request a different ref:
 
 ```bash
--e CCC_AGENT_REF=v1.2.0            # newer pip package
--e CCC_AGENT_BRANCHFS_REF=v0.5.0   # newer branchfs
+-e CCC_AGENT_REF=v1.2.0
 ```
 
 If the ref name is unchanged but the branch has advanced (new commits), force a
-refresh with `-e CCC_AGENT_UPDATE=1` (or
-`CCC_AGENT_BRANCHFS_UPDATE=1` for just branchfs).
+refresh with `-e CCC_AGENT_UPDATE=1` or `-e CCC_AGENT_PIP_UPDATE=1`. BranchFS
+comes from the `ccc-agent[branchfs]` dependency, so updating the pinned BranchFS
+wheel is done by updating the `ccc-agent` package/ref. Set
+`CCC_AGENT_INSTALL_BRANCHFS_EXTRA=0` and `CCC_AGENT_BRANCHFS_BIN=/path/to/branchfs`
+only when an operator wants to provide a BranchFS binary manually.
 
 ## What startup installs and wires
 
 When enabled, startup **installs the dependencies into system dirs** so they are
-always on `PATH`: `bwrap` via `apt-get install bubblewrap` (→ `/usr/bin`), and
-`branchfs` built from `vicoslab/branchfs@master` by default and installed to
-`/usr/local/bin/branchfs` (also installs `libfuse3` so the binary runs without
-`LD_LIBRARY_PATH`). Both installs are **idempotent** (skipped when already
-present) and **best-effort** (a failure warns but never aborts startup); set a
-`*_BIN` var to supply a prebuilt binary and skip building, or
-`CCC_AGENT_INSTALL_DEPS=0` to skip installs entirely.
+always on `PATH`: `bwrap` via `apt-get install bubblewrap` (→ `/usr/bin`),
+`libfuse3-3` for BranchFS runtime linking, and `ccc-agent[branchfs]` through pip.
+The `[branchfs]` extra installs the prebuilt vicoslab BranchFS wheel from the
+BranchFS GitHub release; the CCC image no longer installs Rust/Cargo or builds
+BranchFS from source. Installs are **idempotent** (skipped when the requested
+ccc-agent ref is already present) and **best-effort** at container startup; set
+`CCC_AGENT_BRANCHFS_BIN` to supply a manual BranchFS binary or
+`CCC_AGENT_INSTALL_BRANCHFS_EXTRA=0` to skip the pip extra.
 
 It then installs the runtime (pip package under `/usr`), links the unified
 `ccc-agent` CLI into `/usr/local/bin`, and generates a
@@ -145,11 +148,11 @@ or `CCC_AGENT_CONDA_ACTIVATE_SHIMS=0` to disable this wiring.
 ## Requirements
 
 The container must allow **unprivileged user namespaces** for bwrap confinement.
-A non-baked first start also needs network access (apt + the branchfs git repo +
-the rust toolchain); thereafter the system binaries are reused. For interactive
-agents running as the real (non-root) uid, a fresh `--proc` needs the
-container's masked `/proc` cleared (`--security-opt systempaths=unconfined`); the
-default `bwrap_proc_mode: bind` works without that.
+A non-baked first start also needs network access for apt and pip/GitHub release
+wheel downloads; it no longer needs a Rust toolchain. For interactive agents
+running as the real (non-root) uid, a fresh `--proc` needs the container's masked
+`/proc` cleared (`--security-opt systempaths=unconfined`); the default
+`bwrap_proc_mode: bind` works without that.
 
 Commit/review policy lives entirely in the external runtime; CCC image startup
 only performs opt-in installation/wiring. See the `ccc-agent` repo's

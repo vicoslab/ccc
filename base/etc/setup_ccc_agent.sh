@@ -1,34 +1,34 @@
 #!/bin/sh
 # setup_ccc_agent.sh — install / update / wire the ccc-agent runtime
-# (bwrap + branchfs + the ccc-agent pip package + hooks/config).
+# (bwrap + ccc-agent pip package + packaged BranchFS binary + hooks/config).
 #
 # Called from TWO places:
-#   * the image build (base/Dockerfile, `--install-only`): bakes the heavy,
-#     user-independent bits (bwrap, branchfs binary, pip package) into the image
-#     so an enabled container starts instantly;
-#   * container startup (runit 06_ccc_agent.sh, default = both
-#     phases): a FAST no-op when the baked-in versions already match, and only
-#     rebuilds / re-pips when a newer ref is requested via env (see UPDATING).
+#   * the image build (base/Dockerfile, `--install-only`): bakes the
+#     user-independent bits (bwrap, libfuse runtime, ccc-agent[branchfs] pip
+#     package) into the image so an enabled container starts instantly;
+#   * container startup (runit 06_ccc_agent.sh, default = both phases): a FAST
+#     no-op when the baked-in ref already matches, and only re-pips when a newer
+#     ref is requested via env (see UPDATING).
 #
 # Phases:
-#   install  heavy + user-independent: bwrap, branchfs (built from source),
-#            ccc-agent pip package, libfuse runtime.  Version-guarded
-#            by per-component marker files under ${install_dir}.
+#   install  user-independent: bwrap, libfuse runtime, ccc-agent pip package.
+#            By default the pip package is installed with the [branchfs] extra,
+#            which downloads the vicoslab BranchFS GitHub-release wheel.  No
+#            Rust/Cargo toolchain is required.
 #   wire     light + user-specific: `ccc-agent setup` writes /etc/ccc-agent/
 #            config.json, the managed Claude Stop hook, the codex notify hook,
 #            and (optionally) the transparent PATH shims.  Needs USER_NAME, so it
 #            runs at container startup, NOT at build.
 #
 # UPDATING (env-controlled, the whole point of keeping this callable at runtime):
-#   * Request a different ref and it is rebuilt/re-installed:
-#       CCC_AGENT_REF=<branch|tag|sha>            (the pip package)
-#       CCC_AGENT_BRANCHFS_REF=<branch|tag|sha>   (branchfs)
+#   * Request a different ccc-agent ref and it is re-installed:
+#       CCC_AGENT_REF=<branch|tag|sha>
 #     A changed ref vs. what the image baked (recorded in the marker) triggers a
-#     reinstall of just that component; an unchanged ref is skipped.
+#     reinstall; an unchanged ref is skipped.
 #   * Force a refresh even when the ref name is unchanged (e.g. new commits on
 #     the same branch):
-#       CCC_AGENT_UPDATE=1            (force everything)
-#       CCC_AGENT_BRANCHFS_UPDATE=1   (force just branchfs)
+#       CCC_AGENT_UPDATE=1            (force pip reinstall)
+#       CCC_AGENT_PIP_UPDATE=1        (force just pip reinstall)
 #
 # All installs are best-effort: a failure warns but does not abort container
 # startup, and every step is idempotent.
@@ -66,18 +66,14 @@ conda_activate_shims="${CCC_AGENT_CONDA_ACTIVATE_SHIMS:-${enable_shims}}"
 conda_prefix="${CCC_AGENT_CONDA_PREFIX:-${CONDA_PREFIX:-}}"
 
 install_deps="${CCC_AGENT_INSTALL_DEPS:-1}"
+install_branchfs_extra="${CCC_AGENT_INSTALL_BRANCHFS_EXTRA:-1}"
 branchfs_bin="${CCC_AGENT_BRANCHFS_BIN:-}"
-branchfs_repo="${CCC_AGENT_BRANCHFS_REPO:-https://github.com/vicoslab/branchfs.git}"
-branchfs_ref="${CCC_AGENT_BRANCHFS_REF:-master}"
-branchfs_dest="${CCC_AGENT_BRANCHFS_DEST:-/usr/local/bin/branchfs}"
 
 # Force-update toggles (refresh even when the ref name is unchanged).
 update_all="${CCC_AGENT_UPDATE:-0}"
-update_branchfs="${CCC_AGENT_BRANCHFS_UPDATE:-${update_all}}"
 update_pip="${CCC_AGENT_PIP_UPDATE:-${update_all}}"
 
 # Per-component "what is installed" markers (compared against requested refs).
-branchfs_marker="${install_dir}/.branchfs-ref"
 pip_marker="${install_dir}/.ccc-agent-ref"
 
 apt_get() { DEBIAN_FRONTEND=noninteractive apt-get "$@"; }
@@ -119,72 +115,21 @@ ensure_bwrap() {
 
 branchfs_present() {
     { [ -n "${branchfs_bin}" ] && [ -x "${branchfs_bin}" ]; } \
-        || [ -x "${branchfs_dest}" ] || command -v branchfs >/dev/null 2>&1
+        || command -v branchfs >/dev/null 2>&1
 }
 
-branchfs_up_to_date() {
-    # A prebuilt binary supplied via env is authoritative — never rebuild.
-    [ -n "${branchfs_bin}" ] && [ -x "${branchfs_bin}" ] && return 0
-    truthy "${update_branchfs}" && return 1
-    branchfs_present || return 1
-    [ "$(cat "${branchfs_marker}" 2>/dev/null || true)" = "${branchfs_ref}" ]
-}
-
-ensure_branchfs() {
-    if branchfs_up_to_date; then
-        ensure_libfuse
+ensure_branchfs_runtime() {
+    ensure_libfuse
+    # The default CCC path installs BranchFS through ccc-agent[branchfs] in
+    # ensure_pip_package.  Keep this only as a post-install best-effort check so
+    # images no longer need Rust/Cargo or a BranchFS source build.
+    if branchfs_present; then
         return 0
     fi
-    truthy "${install_deps}" || { echo "ccc-agent: branchfs missing/stale and INSTALL_DEPS=0" >&2; return 0; }
-    command -v apt-get >/dev/null 2>&1 || { echo "ccc-agent: no apt-get; cannot build branchfs" >&2; return 0; }
-
-    echo "ccc-agent: building branchfs from ${branchfs_repo}@${branchfs_ref}"
-    apt_get update -qq || true
-    apt_get install -y --no-install-recommends \
-        libfuse3-dev pkg-config build-essential ca-certificates curl git \
-        || { echo "ccc-agent: warning: branchfs build deps failed" >&2; return 0; }
-
-    # Rust toolchain (NOT present by default).  branchfs ships a v4 Cargo.lock,
-    # which needs cargo >= 1.78 -- newer than apt's cargo on every current
-    # Ubuntu (apt cargo is ~1.75 and fails with "lock file version 4 requires
-    # -Znext-lockfile-bump").  Use an existing cargo ONLY if it is new enough,
-    # otherwise install a current toolchain via rustup (discarded after build).
-    cargo_bin=""
-    existing="$(command -v cargo 2>/dev/null || true)"
-    if [ -n "${existing}" ] && "${existing}" --version 2>/dev/null \
-         | awk '{split($2,a,"."); exit !(a[1]>1 || (a[1]==1 && a[2]>=78))}'; then
-        cargo_bin="${existing}"
-    elif [ -n "${existing}" ]; then
-        echo "ccc-agent: cargo $(${existing} --version 2>/dev/null | awk '{print $2}') too old for branchfs (Cargo.lock v4 needs >= 1.78); using rustup"
-    fi
-    if [ -z "${cargo_bin}" ]; then
-        echo "ccc-agent: installing a current rust toolchain via rustup"
-        export RUSTUP_HOME="${tmpdir}/rustup" CARGO_HOME="${tmpdir}/cargo"
-        curl -fsSL https://sh.rustup.rs \
-            | sh -s -- -y --no-modify-path --profile minimal >/dev/null 2>&1 || true
-        [ -x "${CARGO_HOME}/bin/cargo" ] && cargo_bin="${CARGO_HOME}/bin/cargo"
-    fi
-    if [ -z "${cargo_bin}" ]; then
-        echo "ccc-agent: warning: no suitable rust toolchain; cannot build branchfs" >&2
-        return 0
-    fi
-
-    bsrc="${tmpdir}/branchfs"
-    if ! git clone --depth 1 --branch "${branchfs_ref}" "${branchfs_repo}" "${bsrc}" 2>/dev/null; then
-        if ! { git clone "${branchfs_repo}" "${bsrc}" && git -C "${bsrc}" checkout "${branchfs_ref}"; }; then
-            echo "ccc-agent: warning: branchfs clone failed" >&2
-            return 0
-        fi
-    fi
-    if ( cd "${bsrc}" && "${cargo_bin}" build --release ); then
-        if install -m 0755 "${bsrc}/target/release/branchfs" "${branchfs_dest}"; then
-            printf '%s\n' "${branchfs_ref}" > "${branchfs_marker}"
-            echo "ccc-agent: installed branchfs -> ${branchfs_dest} (ref ${branchfs_ref})"
-        else
-            echo "ccc-agent: warning: failed to install branchfs binary" >&2
-        fi
+    if truthy "${install_branchfs_extra}"; then
+        echo "ccc-agent: warning: BranchFS binary not found after pip install; check ccc-agent[branchfs] install output" >&2
     else
-        echo "ccc-agent: warning: branchfs build failed" >&2
+        echo "ccc-agent: warning: BranchFS binary not found; set CCC_AGENT_BRANCHFS_BIN or enable CCC_AGENT_INSTALL_BRANCHFS_EXTRA=1" >&2
     fi
 }
 
@@ -239,7 +184,16 @@ ensure_pip_package() {
         fi
     fi
 
-    pip_spec="git+${repo}@${ref}"
+    if truthy "${install_deps}"; then
+        if ! "${sp}" -m pip install --break-system-packages --upgrade pip setuptools wheel 2>/dev/null; then
+            "${sp}" -m pip install --upgrade pip setuptools wheel \
+                || echo "ccc-agent: warning: pip self-upgrade failed; continuing with existing pip" >&2
+        fi
+    fi
+
+    pip_extras=""
+    truthy "${install_branchfs_extra}" && pip_extras="[branchfs]"
+    pip_spec="ccc-agent${pip_extras} @ git+${repo}@${ref}"
     echo "ccc-agent: pip-installing ${pip_spec} into ${sp}"
     force_args=""
     if truthy "${update_pip}"; then
@@ -263,8 +217,8 @@ run_install() {
         return 1
     fi
     ensure_bwrap
-    ensure_branchfs
     ensure_pip_package
+    ensure_branchfs_runtime
 }
 
 # =============================================================================
@@ -272,7 +226,6 @@ run_install() {
 # =============================================================================
 
 run_wire() {
-    branchfs_resolved="${branchfs_bin:-$(command -v branchfs 2>/dev/null || echo "${branchfs_dest}")}"
     bwrap_resolved="${CCC_AGENT_BWRAP_BIN:-$(command -v bwrap 2>/dev/null || echo bwrap)}"
 
     setup_bin="$(preferred_ccc_agent 2>/dev/null || true)"
@@ -322,8 +275,9 @@ run_wire() {
     # stays as a back-compat alias.
     register_plugins="${CCC_AGENT_REGISTER_PLUGINS:-${CCC_AGENT_REGISTER_HOOKS:-${enable_shims}}}"
     set -- --system --config "${config_file}" --user-name "${USER_NAME:-user}" \
-        --branchfs-bin "${branchfs_resolved}" --bwrap-bin "${bwrap_resolved}" \
+        --bwrap-bin "${bwrap_resolved}" \
         --storage-root "${storage_root}" --branch-store "${branch_store}"
+    [ -n "${branchfs_bin}" ] && set -- "$@" --branchfs-bin "${branchfs_bin}"
     [ -n "${container_name}" ] && set -- "$@" --container-name "${container_name}"
     [ -n "${state_dir}" ] && set -- "$@" --state-dir "${state_dir}"
     # --no-hooks is the deprecated alias understood by every ccc-agent setup

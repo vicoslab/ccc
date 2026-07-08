@@ -150,6 +150,39 @@ class TestSetupCccAgents(unittest.TestCase):
         self.assertIn("--force-reinstall", install_line)
         self.assertIn("--no-cache-dir", install_line)
 
+    def test_install_requests_branchfs_extra_by_default(self):
+        proc = self.run_install()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        install_lines = [line for line in self.pip_invocations()
+                         if " pip install " in " %s " % line]
+        self.assertTrue(install_lines, self.pip_invocations())
+        self.assertIn("ccc-agent[branchfs]", install_lines[-1])
+
+    def test_install_can_disable_branchfs_extra_for_operator_binary(self):
+        proc = self.run_install({"CCC_AGENT_INSTALL_BRANCHFS_EXTRA": "0"})
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        install_lines = [line for line in self.pip_invocations()
+                         if " pip install " in " %s " % line]
+        self.assertTrue(install_lines, self.pip_invocations())
+        self.assertNotIn("[branchfs]", install_lines[-1])
+
+    def test_wire_lets_ccc_agent_setup_resolve_packaged_branchfs_by_default(self):
+        proc = self.run_setup()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        args = self.setup_args()
+        self.assertNotIn("--branchfs-bin", args)
+
+    def test_wire_passes_explicit_branchfs_override_when_configured(self):
+        explicit = os.path.join(self.bin, "branchfs")
+        proc = self.run_setup({"CCC_AGENT_BRANCHFS_BIN": explicit})
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        args = self.setup_args()
+        self.assertEqual(args[args.index("--branchfs-bin") + 1], explicit)
+
     def test_wire_prefers_system_entrypoint_for_latest_shims(self):
         system_args_file = os.path.join(self.tmp, "system-setup-args.txt")
         self._write_executable_at(

@@ -48,17 +48,15 @@ RUN set -eux; \
         ln -sfn /opt/ccc-fuse-sidecar/bin/fusermount3 "$dir/fusemount"; \
     done
 
-# Bake the ccc-agent runtime into the image so an enabled container starts
-# instantly instead of building rust/branchfs on first boot.
+# Bake the ccc-agent runtime (with vicoslab BranchFS) into the image so an enabled
+# container starts instantly instead of doing pip/apt setup on first boot. 
 # Use --build-arg CCC_AGENT_PREINSTALL=0 to disable install.
 ARG CCC_AGENT_PREINSTALL=1
 ARG CCC_AGENT_REF=master
-ARG CCC_AGENT_BRANCHFS_REF=master
 RUN set -eux; \
     case "${CCC_AGENT_PREINSTALL}" in \
         1|true|TRUE|yes|YES|on|ON) \
             CCC_AGENT_REF="${CCC_AGENT_REF}" \
-            CCC_AGENT_BRANCHFS_REF="${CCC_AGENT_BRANCHFS_REF}" \
                 sh /etc/setup_ccc_agent.sh --install-only; \
             apt-get clean; \
             rm -rf /var/lib/apt/lists/*; \
