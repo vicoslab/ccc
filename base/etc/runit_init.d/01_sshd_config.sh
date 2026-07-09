@@ -43,9 +43,11 @@ truthy() {
     esac
 }
 
-append_setenv() {
+setenv_items=""
+
+add_setenv_item() {
     key="$1"
-    val=$(eval "printf '%s' \"\${${key}:-}\"")
+    val="$2"
     if [ -z "$val" ]; then
         return 0
     fi
@@ -59,20 +61,23 @@ append_setenv() {
             ;;
     esac
 
-    printf 'SetEnv %s=%s\n' "$key" "$val" >> "$sshd_config"
+    item="${key}=${val}"
+    if [ -z "$setenv_items" ]; then
+        setenv_items="$item"
+    else
+        setenv_items="$setenv_items $item"
+    fi
 }
 
-append_literal_setenv() {
+add_env_setenv() {
     key="$1"
-    val="$2"
-    [ -n "$val" ] || return 0
-    case "$val" in
-        *[!A-Za-z0-9_./:-]*)
-            echo "Skipping SSH SetEnv for $key: unsupported characters" >&2
-            return 0
-            ;;
-    esac
-    printf 'SetEnv %s=%s\n' "$key" "$val" >> "$sshd_config"
+    val=$(eval "printf '%s' \"\${${key}:-}\"")
+    add_setenv_item "$key" "$val"
+}
+
+write_setenv_line() {
+    [ -n "$setenv_items" ] || return 0
+    printf 'SetEnv %s\n' "$setenv_items" >> "$sshd_config"
 }
 
 ccc_agent_shim_dir() {
@@ -100,18 +105,24 @@ cat >>"$sshd_config" << EOF
 # profile startup or enabling the full PAM account/session stack.
 EOF
 for key in CONTAINER_NAME CONTAINER_NODE CCC_FUSE_SIDECAR_SOCKET CCC_FUSE_SOCKET_DIR; do
-    append_setenv "$key"
+    add_env_setenv "$key"
 done
 
 if truthy "${CCC_AGENT_ENABLE_SHIMS:-0}"; then
     cat >>"$sshd_config" << EOF
 
 # ccc-agent transparent shims for non-interactive SSH commands, e.g.
-# `ssh host codex --app`. Interactive shells also source the generated shell
+# ssh host codex --app. Interactive shells also source the generated shell
 # hook from the user's rc/profile files.
+# OpenSSH applies only the first SetEnv instance, so all variables are emitted
+# as one directive below.
 EOF
-    append_literal_setenv PATH "$(ccc_agent_ssh_path)"
-    append_literal_setenv CCC_AGENT_SHIM_DIR "$(ccc_agent_shim_dir)"
-    append_literal_setenv CCC_AGENT_ENABLE_SHIMS 1
-    append_literal_setenv CCC_AGENT_REAL_SHELL "${CCC_AGENT_REAL_SHELL:-/bin/bash}"
+    real_shell="${CCC_AGENT_REAL_SHELL:-/bin/bash}"
+    add_setenv_item PATH "$(ccc_agent_ssh_path)"
+    add_setenv_item CCC_AGENT_SHIM_DIR "$(ccc_agent_shim_dir)"
+    add_setenv_item CCC_AGENT_ENABLE_SHIMS 1
+    add_setenv_item CCC_AGENT_REAL_SHELL "$real_shell"
+    add_setenv_item SHELL "$real_shell"
 fi
+
+write_setenv_line

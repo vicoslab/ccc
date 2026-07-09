@@ -312,16 +312,23 @@ class TestSshdConfigCccAgentShims(unittest.TestCase):
         proc = self.run_config(enabled=True)
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stderr, "")
         body = self.read_config()
         expected_home = os.path.join(self.base, "cccagenttest")
         expected_shims = os.path.join(self.install_dir, "shims")
-        self.assertIn("SetEnv PATH=%s:%s/.local/bin" %
-                      (expected_shims, expected_home), body)
-        self.assertIn("SetEnv CCC_AGENT_SHIM_DIR=%s" % expected_shims, body)
-        self.assertIn("SetEnv CCC_AGENT_ENABLE_SHIMS=1", body)
-        self.assertIn("SetEnv CCC_AGENT_REAL_SHELL=/bin/bash", body)
-        self.assertIn("%s/conda/bin" % expected_home, body)
-        self.assertIn("%s/conda/condabin" % expected_home, body)
+        setenv_lines = [line for line in body.splitlines()
+                        if line.startswith("SetEnv ")]
+        self.assertEqual(len(setenv_lines), 1, setenv_lines)
+        setenv = setenv_lines[0]
+        self.assertIn("CONTAINER_NAME=domen-cuda10", setenv)
+        self.assertIn("PATH=%s:%s/.local/bin" %
+                      (expected_shims, expected_home), setenv)
+        self.assertIn("CCC_AGENT_SHIM_DIR=%s" % expected_shims, setenv)
+        self.assertIn("CCC_AGENT_ENABLE_SHIMS=1", setenv)
+        self.assertIn("CCC_AGENT_REAL_SHELL=/bin/bash", setenv)
+        self.assertIn("SHELL=/bin/bash", setenv)
+        self.assertIn("%s/conda/bin" % expected_home, setenv)
+        self.assertIn("%s/conda/condabin" % expected_home, setenv)
 
     def test_sshd_setenv_path_is_absent_when_shims_disabled(self):
         proc = self.run_config(enabled=False)
