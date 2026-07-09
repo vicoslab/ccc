@@ -20,9 +20,13 @@ class TestSetupCccAgents(unittest.TestCase):
         os.makedirs(self.bin)
         self.args_file = os.path.join(self.tmp, "setup-args.txt")
         self.pip_args_file = os.path.join(self.tmp, "pip-args.txt")
+        self.usermod_args_file = os.path.join(self.tmp, "usermod-args.txt")
         self.install_dir = os.path.join(self.tmp, "install")
         self.link_dir = os.path.join(self.install_dir, "shims")
+        self.router = os.path.join(self.install_dir, "bin",
+                                   "ccc-agent-ssh-shell-router")
         self.config_dir = os.path.join(self.tmp, "etc", "ccc-agent")
+        self.shells_file = os.path.join(self.tmp, "etc", "shells")
         self.base = os.path.join(self.tmp, "home-base")
         self.user_home = os.path.join(self.base, "cccagenttest")
         os.makedirs(self.user_home)
@@ -34,11 +38,24 @@ class TestSetupCccAgents(unittest.TestCase):
             "ccc-agent",
             "#!/bin/sh\n"
             "if [ \"${1:-}\" = setup ] && [ \"${2:-}\" = --help ]; then\n"
-            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims --shell-path-hook'\n"
+            "  echo 'usage: ccc-agent setup --storage-root --conda-activate-shims --shell-path-hook --ssh-shell-router'\n"
             "  exit 0\n"
             "fi\n"
+            "prev=\n"
+            "for arg in \"$@\"; do\n"
+            "  if [ \"$prev\" = --ssh-shell-router ]; then\n"
+            "    mkdir -p \"$(dirname \"$arg\")\"\n"
+            "    printf '#!/bin/sh\\n' > \"$arg\"\n"
+            "    chmod +x \"$arg\"\n"
+            "  fi\n"
+            "  prev=$arg\n"
+            "done\n"
             "printf '%s\n' \"$@\" > \"$CCC_AGENT_TEST_ARGS_FILE\"\n"
             "exit 0\n",
+        )
+        self._write_executable(
+            "usermod",
+            "#!/bin/sh\nprintf '%s\n' \"$@\" >> \"$CCC_AGENT_TEST_USERMOD_ARGS_FILE\"\nexit 0\n",
         )
 
     def tearDown(self):
@@ -72,6 +89,8 @@ class TestSetupCccAgents(unittest.TestCase):
             "CCC_AGENT_CONFIG_DIR": self.config_dir,
             "CCC_AGENT_CONFIG": os.path.join(self.config_dir, "config.json"),
             "CCC_AGENT_ENABLE_SHIMS": "1",
+            "CCC_AGENT_SHELLS_FILE": self.shells_file,
+            "CCC_AGENT_TEST_USERMOD_ARGS_FILE": self.usermod_args_file,
             "USER_NAME": "cccagenttest",
             "CONTAINER_NAME": "domen-cuda10",
             "BASE": self.base,
@@ -145,6 +164,20 @@ class TestSetupCccAgents(unittest.TestCase):
             self.assertIn(self.shell_hook, body)
         self.assertIn("--shell-path-hook", self.setup_args())
 
+    def test_wire_installs_ssh_shell_router_when_shims_enabled(self):
+        proc = self.run_setup()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        args = self.setup_args()
+        self.assertIn("--ssh-shell-router", args)
+        self.assertEqual(args[args.index("--ssh-shell-router") + 1],
+                         self.router)
+        self.assertTrue(os.path.exists(self.router), self.router)
+        with open(self.shells_file) as fh:
+            self.assertIn(self.router, fh.read())
+        with open(self.usermod_args_file) as fh:
+            self.assertIn("-s\n%s\ncccagenttest" % self.router, fh.read())
+
     def test_wire_skips_shim_path_wiring_when_shims_disabled(self):
         proc = self.run_setup({"CCC_AGENT_ENABLE_SHIMS": "0"})
 
@@ -152,6 +185,8 @@ class TestSetupCccAgents(unittest.TestCase):
         args = self.setup_args()
         self.assertNotIn("--enable-shims", args)
         self.assertNotIn("--shell-path-hook", args)
+        self.assertNotIn("--ssh-shell-router", args)
+        self.assertFalse(os.path.exists(self.usermod_args_file))
         for name in (".bashrc", ".profile"):
             self.assertFalse(os.path.exists(os.path.join(self.user_home, name)))
 
@@ -282,6 +317,8 @@ class TestSshdConfigCccAgentShims(unittest.TestCase):
         expected_shims = os.path.join(self.install_dir, "shims")
         self.assertIn("SetEnv PATH=%s:%s/.local/bin" %
                       (expected_shims, expected_home), body)
+        self.assertIn("SetEnv CCC_AGENT_ENABLE_SHIMS=1", body)
+        self.assertIn("SetEnv CCC_AGENT_REAL_SHELL=/bin/bash", body)
         self.assertIn("%s/conda/bin" % expected_home, body)
         self.assertIn("%s/conda/condabin" % expected_home, body)
 

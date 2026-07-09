@@ -61,6 +61,9 @@ config_dir="${CCC_AGENT_CONFIG_DIR:-/etc/ccc-agent}"
 config_file="${CCC_AGENT_CONFIG:-${config_dir}/config.json}"
 link_dir="${CCC_AGENT_LINK_DIR:-${install_dir}/shims}"
 shim_path_hook="${CCC_AGENT_SHIM_PATH_HOOK:-${config_dir}/shim-path.sh}"
+ssh_shell_router="${CCC_AGENT_SSH_SHELL_ROUTER:-${install_dir}/bin/ccc-agent-ssh-shell-router}"
+real_shell="${CCC_AGENT_REAL_SHELL:-/bin/bash}"
+shells_file="${CCC_AGENT_SHELLS_FILE:-/etc/shells}"
 enable_shims="${CCC_AGENT_ENABLE_SHIMS:-0}"
 shim_agents="${CCC_AGENT_SHIM_AGENTS:-codex claude hermes opencode}"
 conda_activate_shims="${CCC_AGENT_CONDA_ACTIVATE_SHIMS:-${enable_shims}}"
@@ -259,6 +262,36 @@ EOF
     done
 }
 
+install_user_ssh_shell_router() {
+    router_path="$1"
+    real_shell_path="$2"
+    user_name="${USER_NAME:-user}"
+    [ -x "${router_path}" ] || {
+        echo "ccc-agent: warning: SSH shell router ${router_path} is not executable; not changing ${user_name}'s shell" >&2
+        return 0
+    }
+
+    mkdir -p "$(dirname "${shells_file}")" 2>/dev/null || true
+    touch "${shells_file}" 2>/dev/null || true
+    if [ -w "${shells_file}" ] && ! grep -qxF "${router_path}" "${shells_file}" 2>/dev/null; then
+        printf '%s\n' "${router_path}" >> "${shells_file}" || true
+    fi
+
+    usermod -s "${router_path}" "${user_name}" \
+        || echo "ccc-agent: warning: failed to set ${user_name}'s shell to ${router_path}" >&2
+}
+
+restore_user_ssh_shell_router() {
+    router_path="$1"
+    real_shell_path="$2"
+    user_name="${USER_NAME:-user}"
+    current_shell="$(getent passwd "${user_name}" 2>/dev/null | cut -d: -f7 || true)"
+    [ "${current_shell}" = "${router_path}" ] || return 0
+    [ -x "${real_shell_path}" ] || real_shell_path=/bin/bash
+    usermod -s "${real_shell_path}" "${user_name}" \
+        || echo "ccc-agent: warning: failed to restore ${user_name}'s shell to ${real_shell_path}" >&2
+}
+
 run_wire() {
     bwrap_resolved="${CCC_AGENT_BWRAP_BIN:-$(command -v bwrap 2>/dev/null || echo bwrap)}"
 
@@ -317,6 +350,7 @@ run_wire() {
     # --no-hooks is the deprecated alias understood by every ccc-agent setup
     # build; it now disables agent_plugins. Keep it for version-skew safety.
     truthy "${register_plugins}" || set -- "$@" --no-hooks
+    ssh_router_for_user=""
     if truthy "${enable_shims}"; then
         set -- "$@" --enable-shims --shim-agents "${shim_agents}" --link-dir "${link_dir}"
         if "${setup_bin}" setup --help 2>&1 | grep -q -- '--shell-path-hook'; then
@@ -324,9 +358,16 @@ run_wire() {
         else
             echo "ccc-agent: warning: installed ccc-agent lacks --shell-path-hook; interactive shells may not prefer shims over user-local agents. Set CCC_AGENT_UPDATE=1 and restart." >&2
         fi
+        if "${setup_bin}" setup --help 2>&1 | grep -q -- '--ssh-shell-router'; then
+            set -- "$@" --ssh-shell-router "${ssh_shell_router}"
+            ssh_router_for_user="${ssh_shell_router}"
+        else
+            echo "ccc-agent: warning: installed ccc-agent lacks --ssh-shell-router; SSH absolute Claude/Codex commands may bypass ccc-agent. Set CCC_AGENT_UPDATE=1 and restart." >&2
+        fi
         install_user_shell_shim_hook "${shim_path_hook}"
     else
         rm -f "${shim_path_hook}" 2>/dev/null || true
+        restore_user_ssh_shell_router "${ssh_shell_router}" "${real_shell}"
     fi
     if truthy "${conda_activate_shims}"; then
         if [ -n "${conda_prefix_resolved}" ] && { [ -n "${conda_prefix}" ] || [ -d "${conda_prefix_resolved}" ]; }; then
@@ -340,6 +381,9 @@ run_wire() {
         fi
     fi
     "${setup_bin}" setup "$@"
+    if truthy "${enable_shims}" && [ -n "${ssh_router_for_user}" ]; then
+        install_user_ssh_shell_router "${ssh_router_for_user}" "${real_shell}"
+    fi
     echo "ccc-agent: wired; CCC_AGENT_CONFIG=${config_file}"
 }
 

@@ -106,4 +106,6 @@ if truthy "${CCC_AGENT_ENABLE_SHIMS:-0}"; then
 # hook from the user's rc/profile files.
 EOF
     append_literal_setenv PATH "$(ccc_agent_ssh_path)"
+    append_literal_setenv CCC_AGENT_ENABLE_SHIMS 1
+    append_literal_setenv CCC_AGENT_REAL_SHELL "${CCC_AGENT_REAL_SHELL:-/bin/bash}"
 fi
