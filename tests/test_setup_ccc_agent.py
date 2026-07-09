@@ -317,6 +317,7 @@ class TestSshdConfigCccAgentShims(unittest.TestCase):
         expected_shims = os.path.join(self.install_dir, "shims")
         self.assertIn("SetEnv PATH=%s:%s/.local/bin" %
                       (expected_shims, expected_home), body)
+        self.assertIn("SetEnv CCC_AGENT_SHIM_DIR=%s" % expected_shims, body)
         self.assertIn("SetEnv CCC_AGENT_ENABLE_SHIMS=1", body)
         self.assertIn("SetEnv CCC_AGENT_REAL_SHELL=/bin/bash", body)
         self.assertIn("%s/conda/bin" % expected_home, body)

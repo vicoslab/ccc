@@ -75,6 +75,11 @@ append_literal_setenv() {
     printf 'SetEnv %s=%s\n' "$key" "$val" >> "$sshd_config"
 }
 
+ccc_agent_shim_dir() {
+    install_dir="${CCC_AGENT_INSTALL_DIR:-/opt/ccc-agent}"
+    printf '%s\n' "${CCC_AGENT_LINK_DIR:-${install_dir}/shims}"
+}
+
 ccc_agent_ssh_path() {
     user_name="${USER_NAME:-user}"
     user_home="${BASE%/}/${user_name}"
@@ -106,6 +111,7 @@ if truthy "${CCC_AGENT_ENABLE_SHIMS:-0}"; then
 # hook from the user's rc/profile files.
 EOF
     append_literal_setenv PATH "$(ccc_agent_ssh_path)"
+    append_literal_setenv CCC_AGENT_SHIM_DIR "$(ccc_agent_shim_dir)"
     append_literal_setenv CCC_AGENT_ENABLE_SHIMS 1
     append_literal_setenv CCC_AGENT_REAL_SHELL "${CCC_AGENT_REAL_SHELL:-/bin/bash}"
 fi
