@@ -145,6 +145,20 @@ hits the CCC shim first while the shim still resolves the real agent binary from
 the active env. Set `CCC_AGENT_CONDA_PREFIX` for a non-standard env,
 or `CCC_AGENT_CONDA_ACTIVATE_SHIMS=0` to disable this wiring.
 
+For non-interactive SSH, the installed router broadly recognizes Claude, Codex,
+and Hermes traffic and asks the packaged ccc-agent runtime for adaptive process
+lifecycle handling. It does not classify private `serve`/`bridge`/`proxy`
+subcommands. Long-lived direct commands stay foreground and kill leaked helpers
+at exit; only an early successful launcher whose stable descendants release both
+output streams is treated as a detached service. The trusted supervisor then
+keeps bwrap and BranchFS alive after the bootstrap SSH command returns.
+
+This behavior is implemented entirely in the installed ccc-agent wheel and its
+packaged router. CCC images do not maintain a second router/lifecycle copy: rebuild
+the image with the desired `CCC_AGENT_REF`, or set `CCC_AGENT_UPDATE=1` at startup
+after that ref advances. Later bridge/proxy SSH commands remain independent
+ccc-agent sessions; no active service lane or session-attachment layer is used.
+
 ## Requirements
 
 The container must allow **unprivileged user namespaces** for bwrap confinement.
