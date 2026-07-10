@@ -159,6 +159,14 @@ the image with the desired `CCC_AGENT_REF`, or set `CCC_AGENT_UPDATE=1` at start
 after that ref advances. Later bridge/proxy SSH commands remain independent
 ccc-agent sessions; no active service lane or session-attachment layer is used.
 
+Contained commands inherit the complete container/invocation environment by
+default rather than a fixed allowlist. This preserves `CONTAINER_NAME`,
+`CONTAINER_NODE`, `CCC_FUSE_SIDECAR_SOCKET`, CUDA/NVIDIA, Conda, SSH agent,
+library-path, credential, and future image feature variables. ccc-agent removes
+only stale internal session/control values and its host-side state-dir path, then
+sets fresh contained values. Deployment-specific removals are explicit in
+`bwrap_unsetenv`; trusted replacements use `bwrap_setenv`.
+
 ## Requirements
 
 The container must allow **unprivileged user namespaces** for bwrap confinement.
