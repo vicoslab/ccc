@@ -1,6 +1,8 @@
 """Tests for the CCC image ccc-agent setup wrapper."""
 
 import os
+import pwd
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -10,6 +12,8 @@ CCC_DIR = os.path.dirname(HERE)
 SETUP_SH = os.path.join(CCC_DIR, "base", "etc", "setup_ccc_agent.sh")
 SSHD_CONFIG_SH = os.path.join(
     CCC_DIR, "base", "etc", "runit_init.d", "01_sshd_config.sh")
+CCC_AGENT_INIT_SH = os.path.join(
+    CCC_DIR, "base", "etc", "runit_init.d", "06_ccc_agent.sh")
 
 
 class TestSetupCccAgents(unittest.TestCase):
@@ -335,6 +339,117 @@ class TestSshdConfigCccAgentShims(unittest.TestCase):
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertNotIn("SetEnv PATH=", self.read_config())
+
+
+class TestAgentRuntimeDirectories(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = self._tmp.name
+        self.user = pwd.getpwuid(os.getuid()).pw_name
+        self.base = os.path.join(self.tmp, "home")
+        self.home = os.path.join(self.base, self.user)
+        self.runtime = os.path.join(self.tmp, "run", "user", str(os.getuid()),
+                                    "ccc-agent-runtime")
+        os.makedirs(self.home)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def run_init(self):
+        env = {
+            "PATH": "/usr/bin:/bin",
+            "BASE": self.base,
+            "USER_NAME": self.user,
+            "CCC_AGENT_ENABLE": "0",
+            "CCC_AGENT_USER_RUNTIME_DIR": os.path.dirname(self.runtime),
+            "CCC_AGENT_RUNTIME_ROOT": self.runtime,
+        }
+        return subprocess.run(
+            ["sh", CCC_AGENT_INIT_SH], env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    def assert_runtime_layout(self):
+        links = {
+            os.path.join(self.home, ".claude", "remote", "run"):
+                os.path.join(self.runtime, "claude"),
+            os.path.join(self.home, ".codex", "app-server-control"):
+                os.path.join(self.runtime, "codex"),
+        }
+        for source, target in links.items():
+            self.assertTrue(os.path.islink(source), source)
+            self.assertEqual(os.readlink(source), target)
+            self.assertTrue(os.path.isdir(target), target)
+            self.assertEqual(stat.S_IMODE(os.stat(target).st_mode), 0o700)
+        self.assertEqual(stat.S_IMODE(os.stat(self.runtime).st_mode), 0o700)
+
+    def test_runtime_links_are_created_without_agent_or_existing_state(self):
+        proc = self.run_init()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assert_runtime_layout()
+
+    def test_existing_runtime_directories_are_replaced_as_ephemeral_state(self):
+        claude = os.path.join(self.home, ".claude", "remote", "run")
+        codex = os.path.join(self.home, ".codex", "app-server-control")
+        os.makedirs(claude)
+        os.makedirs(codex)
+        with open(os.path.join(claude, "rpc.sock"), "w") as fh:
+            fh.write("stale")
+        with open(os.path.join(codex, "app-server.log"), "w") as fh:
+            fh.write("stale")
+        claude_settings = os.path.join(self.home, ".claude", "settings.json")
+        codex_config = os.path.join(self.home, ".codex", "config.toml")
+        with open(claude_settings, "w") as fh:
+            fh.write("persistent")
+        with open(codex_config, "w") as fh:
+            fh.write("persistent")
+
+        proc = self.run_init()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assert_runtime_layout()
+        self.assertFalse(os.path.exists(os.path.join(claude, "rpc.sock")))
+        self.assertFalse(os.path.exists(os.path.join(codex, "app-server.log")))
+        for path in (claude_settings, codex_config):
+            with open(path) as fh:
+                self.assertEqual(fh.read(), "persistent")
+
+    def test_wrong_or_broken_runtime_links_are_replaced(self):
+        claude = os.path.join(self.home, ".claude", "remote", "run")
+        codex = os.path.join(self.home, ".codex", "app-server-control")
+        os.makedirs(os.path.dirname(claude))
+        os.makedirs(os.path.dirname(codex))
+        os.symlink(os.path.join(self.tmp, "missing-claude"), claude)
+        os.symlink(os.path.join(self.tmp, "wrong-codex"), codex)
+
+        proc = self.run_init()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assert_runtime_layout()
+
+    def test_existing_local_targets_are_reused_with_private_permissions(self):
+        for name in ("claude", "codex"):
+            target = os.path.join(self.runtime, name)
+            os.makedirs(target)
+            os.chmod(target, 0o755)
+
+        proc = self.run_init()
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assert_runtime_layout()
+
+    def test_runtime_setup_is_idempotent(self):
+        first = self.run_init()
+        self.assertEqual(first.returncode, 0, first.stderr)
+        links = [os.path.join(self.home, ".claude", "remote", "run"),
+                 os.path.join(self.home, ".codex", "app-server-control")]
+        before = [os.lstat(path).st_ino for path in links]
+
+        second = self.run_init()
+
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual([os.lstat(path).st_ino for path in links], before)
+        self.assert_runtime_layout()
 
 
 if __name__ == "__main__":
