@@ -17,6 +17,7 @@ RUN apt-get -o Acquire::Retries=3 update --fix-missing && \
 			libglib2.0-0 libxext6 libsm6 libxrender1 libgl1 libglx-mesa0 libglu1-mesa libxt6 libxtst6 libxi6 \
 			nano htop tmux curl git cmake \
 			runit rsyslog cron  openssh-server && \
+    apt-get install -y --no-install-recommends libibverbs1 ibverbs-providers ibverbs-utils && \
     mkdir -p /run/ccc-fuse-sidecar && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
