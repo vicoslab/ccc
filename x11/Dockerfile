@@ -10,6 +10,7 @@ RUN apt-get clean && \
     apt-get -o Acquire::Retries=3 update --fix-missing && \
     apt-get install -y --no-install-recommends xfce4 mate-terminal krusader && \
     apt-get install -y --no-install-recommends xubuntu-artwork xubuntu-icon-theme  breeze-icon-theme && \
+    apt-get install -y --no-install-recommends libgl1 libglx-mesa0 libgl1-mesa-dri libglu1-mesa libxt6 libxtst6 libxi6 && \
     apt-get install -y --no-install-recommends ristretto gvfs gvfs-backends thunar-archive-plugin kio-extras ktexteditor-katepart && \
     apt-get auto-remove -y && \
     rm -rf /var/lib/apt/lists/*
