@@ -13,8 +13,13 @@ env LOCAL_SSD_STORAGE /storage/local/ssd
 ENV CCC_FUSE_SIDECAR_SOCKET=/run/ccc-fuse-sidecar/fuse.sock
 
 RUN apt-get -o Acquire::Retries=3 update --fix-missing && \
+    if apt-cache show libglx-mesa0 2>/dev/null | grep -q '^Package: libglx-mesa0$'; then \
+        mesa_packages="libgl1 libglx-mesa0"; \
+    else \
+        mesa_packages="libgl1-mesa-glx"; \
+    fi && \
     apt-get install -y build-essential wget bzip2 ca-certificates \
-			libglib2.0-0 libxext6 libsm6 libxrender1 libgl1 libglx-mesa0 libglu1-mesa libxt6 libxtst6 libxi6 \
+			libglib2.0-0 libxext6 libsm6 libxrender1 $mesa_packages libgl1-mesa-dri libglu1-mesa libxt6 libxtst6 libxi6 \
 			nano htop tmux curl git cmake \
 			runit rsyslog cron  openssh-server && \
     apt-get install -y --no-install-recommends libibverbs1 ibverbs-providers ibverbs-utils && \
@@ -59,4 +64,3 @@ ENV CUDA_VISIBLE_DEVICES -1
 
 
 ENTRYPOINT ["/sbin/start_wrapped"]
-
