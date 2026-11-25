@@ -2,47 +2,41 @@
 
 USER_NAME=${USER_NAME:-user}
 USER_HOME=${BASE%"/"}/$USER_NAME
-USER_ID=`id -u $USER_NAME`
-
+SCRIPT_DIR=$(dirname -- "$0")
 export HOME=$USER_HOME
 
 CONDA_BIN=$USER_HOME/conda/bin/conda
-
 CCC_TOOLS_ENABLE=${CCC_TOOLS_ENABLE:-1}
-
 CCC_TOOLS_ENV=${CCC_TOOLS_ENV:-ccc-tools}
 CCC_TOOLS_PYTHON_VER=${CCC_TOOLS_PYTHON_VER:-3.11}
+CCC_TOOLS_GITHUB=${CCC_TOOLS_GITHUB:-https://github.com/vicoslab/ccc-tools}
 
-CCC_TOOLS_GITHUB=${CCC_TOOLS_GITHUB:-"https://github.com/vicoslab/ccc-tools"}
-
-if [ "$CCC_TOOLS_ENABLE" = 1 ]; then
-
-    # wait until installation flag is finished if exists
-    while [ -f "$USER_HOME/ccc-tools.installing" ]; do sleep 2; done	
-
-    echo "Installing ccc-tools ..."
-    if [ -z "$(${CONDA_BIN} env list | grep "^${CCC_TOOLS_ENV} */")" ]; then
-        # mark instalation in progress to prevent concurrent installs from containers with shared HOME
-        chpst -u $USER_NAME touch "$USER_HOME/ccc-tools.installing"
-
-        { chpst -u $USER_NAME $CONDA_BIN create --name $CCC_TOOLS_ENV python=$CCC_TOOLS_PYTHON_VER -y &&
-        chpst -u $USER_NAME $CONDA_BIN run -n $CCC_TOOLS_ENV pip install --no-input git+$CCC_TOOLS_GITHUB ; } && INSTALLED=1 || INSTALLED=0
-
-        # clear "in instalation" flag
-        chpst -u $USER_NAME rm "$USER_HOME/ccc-tools.installing"
-    else
-        INSTALLED=1
+install_ccc_tools() {
+    local conda=$1 env=$2 python=$3 repo=$4 envs bin
+    echo 'Installing ccc-tools ...' >&2
+    # An unavailable env listing must not make this optional install fatal.
+    if ! envs=$("$conda" env list) || ! grep -q "^${env} */" <<< "$envs"; then
+        if ! { "$conda" create --name "$env" "python=$python" -y &&
+               "$conda" run -n "$env" pip install --no-input "git+$repo"; } >&2; then
+            return 20  # Optional install failure; startup can continue without the tool.
+        fi
     fi
+    bin=$("$conda" run -n "$env" which ccc)
+    printf '%s\n' "$bin"
+}
+export -f install_ccc_tools
 
-    if [ "$INSTALLED" = 1 ]; then
-        # instally symlink to ccc binary in conda to system path
-        CCC_BIN=$(chpst -u $USER_NAME $CONDA_BIN run -n $CCC_TOOLS_ENV which ccc)
-
-        ln -sf $CCC_BIN /usr/bin/ccc
-
-        echo "  (done)"	
+if [[ $CCC_TOOLS_ENABLE == 1 ]]; then
+    if CCC_BIN=$(chpst -u "$USER_NAME" /bin/bash "$SCRIPT_DIR/../ccc-install-lock.sh" \
+        "$USER_HOME/ccc-tools.installing" /bin/bash -ec 'install_ccc_tools "$@"' install_ccc_tools \
+        "$CONDA_BIN" "$CCC_TOOLS_ENV" "$CCC_TOOLS_PYTHON_VER" "$CCC_TOOLS_GITHUB"); then
+        ln -sf "$CCC_BIN" /usr/bin/ccc
+        echo '  (done)'
     else
-        echo "ERROR"
-        echo "FAILED TO INSTALL ccc-tools, but continuing anyway (!!!)"
+        status=$?
+        if [[ $status != 20 ]]; then
+            exit "$status"
+        fi
+        echo 'FAILED TO INSTALL ccc-tools, but continuing anyway (!!!)' >&2
     fi
 fi
