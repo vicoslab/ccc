@@ -25,7 +25,9 @@ if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "$USER_NAME" ]; then
     groupdel "$EXISTING_GROUP" > /dev/null 2>&1 || true
 fi
 
-getent passwd $USER_NAME || adduser --uid=$USER_ID --home=$USER_HOME --disabled-password --gecos "" $USER_NAME
+# Create the container-local account without copying files into shared storage.
+getent passwd "$USER_NAME" || adduser --uid="$USER_ID" --home="$USER_HOME" \
+    --no-create-home --disabled-password --gecos "" "$USER_NAME"
 
 # OpenSSH 9.x (Ubuntu 24.04) refuses *all* authentication -- including publickey
 # -- for accounts whose password is "locked", i.e. a shadow field starting with
@@ -72,74 +74,54 @@ if [ ! -z "${USER_GROUPS}" ]; then
     done
 fi
 
-CURRENT_HOME_OWNER=$(stat -c '%U' $USER_HOME)
+# The lock lives inside the home. Create an empty directory if needed, but
+# don't populate it until setup_shared_home runs under that lock.
+mkdir -p -m 750 -- "$USER_HOME"
+CURRENT_HOME_OWNER=$(stat -c '%U' -- "$USER_HOME")
 
 if [ "$CURRENT_HOME_OWNER" != "$USER_NAME" ]; then
-    chown $USER_NAME:$USER_NAME $USER_HOME
-    chpst -u $USER_NAME chmod 750 $USER_HOME
-fi
-# copy default profile files if they do not exist yet
-# (cannot use -m from adduser since folder many already exist due to mounting)
-chpst -u $USER_NAME cp -r -n /etc/skel/. $USER_HOME/.
-
-mutex_user_lock() {
-    # wait until all other users finish
-    while [ -f "$USER_HOME/user.installing" ]; do sleep 2; done	
-    
-    # mark in file that user.installing is in installation check
-    chpst -u $USER_NAME touch "$USER_HOME/user.installing"
-}
-
-mutex_user_unlock() {
-    # clear "in installation" flag
-    chpst -u $USER_NAME rm "$USER_HOME/user.installing" 2> /dev/null
-}
-
-mutex_user_lock
-
-# install SSH keys
-if [ ! -z "${USER_PUBKEY}" ]; then
-    
-    chpst -u $USER_NAME mkdir -p $USER_HOME/.ssh
-    # add provided public key if not present yet
-    if ! grep -Fxq "${USER_PUBKEY}" $USER_HOME/.ssh/authorized_keys ;  then
-        echo "Adding SSH public key:"
-        echo "${USER_PUBKEY}" | chpst -u $USER_NAME tee -a $USER_HOME/.ssh/authorized_keys
-    fi
-    chpst -u $USER_NAME chown -R $USER_NAME:$USER_NAME $USER_HOME/.ssh
-
-    chpst -u $USER_NAME chmod 700 $USER_HOME/.ssh
-    chpst -u $USER_NAME chmod 600 $USER_HOME/.ssh/authorized_keys
-    
+    chown "$USER_NAME:$USER_NAME" "$USER_HOME"
+    chpst -u "$USER_NAME" chmod 750 "$USER_HOME"
 fi
 
 change_home_subfolder_into_local() {
-    SUBFOLDER_NAME=$1
-    SRC_FOLDER=$USER_HOME/$SUBFOLDER_NAME
-    TARGET_FOLDER=$LOCAL_SSD_STORAGE/$CONTAINER_NAME/$SUBFOLDER_NAME
+    local src=$1 target=$2 suffix
 
-    chpst -u $USER_NAME mkdir -p $TARGET_FOLDER
-    
-    # check if existing folder is not symlink but actual folder -- rename it in case user has something important there
-    if [ -d "$SRC_FOLDER" ] && [ ! -h "$SRC_FOLDER" ] ; then
-        RANDOM_SUFFIX=$(date +%s | sha256sum | base64 | head -c 4)
-        chpst -u $USER_NAME mv "$SRC_FOLDER" "${SRC_FOLDER}_backup_${RANDOM_SUFFIX}"
-        
-        echo "Renamed existing $SRC_FOLDER folder  into ${SRC_FOLDER}_backup_${RANDOM_SUFFIX}"
+    mkdir -p -- "$target"
+    if [[ -d $src && ! -L $src ]]; then
+        suffix=$(date +%s | sha256sum | base64 | head -c 4)
+        mv -- "$src" "${src}_backup_${suffix}"
+        echo "Renamed existing $src folder into ${src}_backup_${suffix}"
     fi
-    
-    # check if storage already exist but avoid creating if already there
-    if [ ! -f "$SRC_FOLDER" ] || [ "$(readlink -f $SRC_FOLDER)" != "$TARGET_FOLDER" ]; then
-        chpst -u $USER_NAME ln -sfn $TARGET_FOLDER $SRC_FOLDER
-        
-        echo "Created symlink $SRC_FOLDER -> $TARGET_FOLDER"
+    if [[ ! -L $src || $(readlink -f -- "$src") != "$target" ]]; then
+        ln -sfn -- "$target" "$src"
+        echo "Created symlink $src -> $target"
     fi
 }
 
-# create symlink to local storage for .cache files
-if [ ! -z "$LOCAL_SSD_STORAGE" ]; then    
-    change_home_subfolder_into_local ".cache"
-    change_home_subfolder_into_local ".services"
-fi
+setup_shared_home() {
+    local user=$1 home=$2 pubkey=$3
+    # Populate new and pre-existing shared homes under the same lock.
+    cp -r -n /etc/skel/. "$home/."
 
-mutex_user_unlock
+    if [[ -n $pubkey ]]; then
+        mkdir -p -- "$home/.ssh"
+        if ! grep -Fxq -- "$pubkey" "$home/.ssh/authorized_keys"; then
+            echo 'Adding SSH public key:'
+            printf '%s\n' "$pubkey" | tee -a "$home/.ssh/authorized_keys"
+        fi
+        chown -R "$user:$user" "$home/.ssh"
+        chmod 700 "$home/.ssh"
+        chmod 600 "$home/.ssh/authorized_keys"
+    fi
+
+    if [[ -n $LOCAL_SSD_STORAGE ]]; then
+        change_home_subfolder_into_local "$home/.cache" "$LOCAL_SSD_STORAGE/$CONTAINER_NAME/.cache"
+        change_home_subfolder_into_local "$home/.services" "$LOCAL_SSD_STORAGE/$CONTAINER_NAME/.services"
+    fi
+}
+export -f setup_shared_home change_home_subfolder_into_local
+
+exec chpst -u "$USER_NAME" /bin/bash "$(dirname -- "$0")/../ccc-install-lock.sh" \
+    "$USER_HOME/user.installing" /bin/bash -ec 'setup_shared_home "$@"' setup_shared_home \
+    "$USER_NAME" "$USER_HOME" "$USER_PUBKEY"
