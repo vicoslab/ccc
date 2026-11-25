@@ -1,3 +1,14 @@
+Changes for v1.15 (unreleased):
+ - bugfixes:
+	- timestamp the existing `.installing` markers for user setup, Miniconda, ccc-tools, and JetBrains Projector so abandoned markers no longer block startup indefinitely
+	- replace markers after 60 minutes by default (configurable via `CCC_INSTALL_LOCK_TIMEOUT`, in seconds); use file modification time for legacy empty markers, without relying on `flock`
+
+Changes for v1.14:
+ - minor updates:
+	- added RDMA userspace libraries, providers, and tools to the base image (`libibverbs1`, `ibverbs-providers`, `ibverbs-utils`)
+ - bugfixes:
+	- improved Mesa compatibility across Ubuntu releases: use `libgl1` and `libglx-mesa0` where available, fall back to `libgl1-mesa-glx`, and include `libgl1-mesa-dri` for rendering
+
 Changes for v1.13:
  - bugfixes:
 	- fixed USER_GROUPS not honoring the requested GID when it was already in use (e.g. docker=998 colliding with the runit-log groups)
