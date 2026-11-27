@@ -1,6 +1,8 @@
 #!/bin/bash -e
 
-cat >/etc/ssh/sshd_config << EOF
+sshd_config="${CCC_SSHD_CONFIG:-/etc/ssh/sshd_config}"
+
+cat >"$sshd_config" << EOF
 HostKey $BASE/.sshd/keys/ssh_host_rsa_key
 HostKey $BASE/.sshd/keys/ssh_host_ecdsa_key
 HostKey $BASE/.sshd/keys/ssh_host_ed25519_key
@@ -31,6 +33,9 @@ Subsystem sftp internal-sftp
 
 # Enable message-of-the-day on SSH logins
 PrintMotd yes
+
+# Keep personal keys first. sshd skips the managed file when it is absent.
+AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2 /run/compute-container-keymaster/authorized_keys/%u
 EOF
 
 append_setenv() {
@@ -49,10 +54,10 @@ append_setenv() {
             ;;
     esac
 
-    printf 'SetEnv %s=%s\n' "$key" "$val" >> /etc/ssh/sshd_config
+    printf 'SetEnv %s=%s\n' "$key" "$val" >> "$sshd_config"
 }
 
-cat >>/etc/ssh/sshd_config << EOF
+cat >>"$sshd_config" << EOF
 
 # Container runtime identity for SSH sessions. This covers non-interactive
 # SSH commands such as running archivemount remotely without requiring shell

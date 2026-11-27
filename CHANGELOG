@@ -1,4 +1,6 @@
 Changes for v1.15 (unreleased):
+ - minor updates:
+	- added built-in SSH support for managed credentials between CCC container peers; personal authorized keys still work without a Keymaster mount
  - bugfixes:
 	- timestamp the existing `.installing` markers for user setup, Miniconda, ccc-tools, and JetBrains Projector so abandoned markers no longer block startup indefinitely
 	- replace markers after 60 minutes by default (configurable via `CCC_INSTALL_LOCK_TIMEOUT`, in seconds); use file modification time for legacy empty markers, without relying on `flock`
